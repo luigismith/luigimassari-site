@@ -17,8 +17,9 @@ import { SceneAudio } from "./audio.js";
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
-  overview: { pos: V(-0.4, 1.52, 1.76), target: V(0.14, 1.03, -0.14), fov: 41 },
-  dev: { pos: V(-0.36, 1.24, 1.5), target: V(-0.45, 1.07, -0.2), fov: 40 },
+  overview: { pos: V(-0.64, 1.6, 2.02), target: V(-0.02, 1.02, -0.14), fov: 41 },
+  dev: { pos: V(-0.26, 1.24, 1.5), target: V(-0.35, 1.07, -0.2), fov: 40 },
+  print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
   shop: { pos: V(0.6, 1.42, 0.98), target: V(0.6, 0.84, -0.04), fov: 40 },
   about: { pos: V(0.0, 1.2, 0.5), target: V(0.05, 0.77, 0.06), fov: 40 },
   contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },
@@ -97,7 +98,8 @@ export async function start({ data, root, force, toLofi }) {
   await nextFrame();
   const objects = await createObjects(ctx, desk.woodMap, (f) => ui.progress(0.6 + f * 0.3));
   scene.add(objects.group);
-  scene.add(createExtras(data).group);
+  const extras = createExtras(data);
+  scene.add(extras.group);
   mergeStatic(desk.group);
   mergeStatic(room.group);
   mergeStatic(lamp.group);
@@ -150,6 +152,7 @@ export async function start({ data, root, force, toLofi }) {
     hits.push(m);
   }
   addHit(objects.sections.dev, "dev");
+  addHit(extras.printer, "print");
   addHit(objects.sections.about, "about");
   addHit(objects.sections.contact, "contact");
   addHit(room.poster, "lab");
@@ -170,11 +173,11 @@ export async function start({ data, root, force, toLofi }) {
   }
   const hitOf = (view) => hits.filter((m) => m.userData.view === view);
   addTag("dev", hitOf("dev")[0].userData.top, 26);
+  addTag("print", hitOf("print")[0].userData.top, 24);
   const synthTops = hitOf("shop").map((m) => m.userData.top);
   addTag("shop", synthTops.reduce((acc, p) => acc.add(p), V(0, 0, 0)).multiplyScalar(1 / synthTops.length).setY(Math.max(...synthTops.map((p) => p.y))), 44);
-  addTag("about", hitOf("about")[0].userData.top, 34);
-  addTag("contact", hitOf("contact")[0].userData.top, 22);
   addTag("lab", hitOf("lab")[0].position.clone().add(V(0, -0.2, 0)), 0); // a meta' poster: non copre il selettore della lingua
+  addTag("contact", hitOf("contact")[0].userData.top, 22);
   const tagPos = new THREE.Vector3();
   function updateTags() {
     const on = state.entered && state.view === "overview" && !rig.moving;
@@ -293,7 +296,8 @@ export async function start({ data, root, force, toLofi }) {
     tmp.copy(top).project(camera);
     const x = (tmp.x + 1) / 2 * size.x, y = (1 - tmp.y) / 2 * size.y;
     if (slug && state.view === "shop") ui.showLabel(x, y, products[slug].name, products[slug].status_label);
-    else ui.hideLabel(); // nella vista d'insieme ci sono gia' le etichette fisse
+    else if (view === "about" && state.view === "overview") ui.showLabel(x, y, data.ui.labels.about); // il tablet non ha etichetta fissa
+    else ui.hideLabel(); // per le sezioni ci sono gia' le etichette fisse
   }
 
   resize();
@@ -312,6 +316,7 @@ export async function start({ data, root, force, toLofi }) {
     t += dt;
     room.update(t);
     objects.update(t, dt, frameCtx);
+    extras.update(t);
     rig.update(dt);
     updateHover();
     updateTags();
@@ -375,10 +380,10 @@ export async function start({ data, root, force, toLofi }) {
     audio.setEnabled(sound);
     ui.setSound(sound);
     ui.setView("overview");
-    // "Chi sono" e' la pagina d'arrivo; un hash nell'URL (link condiviso) ha la precedenza
+    // si arriva sulla plancia (il banco intero con le sezioni); un hash nell'URL apre subito quella sezione
     const v = hashView();
-    if (v === "overview") history.replaceState(null, "", "#" + data.hash.about);
-    goTo(v === "overview" ? "about" : v);
+    if (v !== "overview") goTo(v);
+    else root.focus({ preventScroll: true });
   });
   return api;
 }

@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
-  recorderTopTexture, grilleTexture, scopePanelTexture,
+  recorderTopTexture, grilleTexture,
 } from "./textures.js";
 
 export const DESK = { y: 0.75, w: 2.2, d: 0.8, x0: -1.1, x1: 1.1, z0: -0.4, z1: 0.4 };
@@ -174,71 +174,6 @@ export function knob3d(M, r, h, angleDeg) {
   line.rotation.y = -a;
   g.add(body, skirt, cap, line);
   return g;
-}
-
-// ---------------------------------------------------------------------------
-// Oscilloscopio con traccia viva (shader)
-// ---------------------------------------------------------------------------
-const SCOPE_FRAG = /* glsl */ `
-uniform float uTime; varying vec2 vUv;
-void main(){
-  vec2 uv = vUv;
-  vec2 grid = abs(fract(uv * vec2(10.0, 8.0)) - 0.5);
-  float gl = smoothstep(0.485, 0.5, max(grid.x, grid.y));
-  vec3 col = vec3(0.016, 0.011, 0.004) + vec3(0.06, 0.04, 0.015) * gl;
-  float t = uTime;
-  float x = uv.x * 6.2831 * 2.0;
-  float y = 0.5 + 0.22 * sin(x + t * 2.0) * (0.75 + 0.25 * sin(t * 0.7)) + 0.07 * sin(x * 3.0 - t * 3.1) + 0.03 * sin(x * 7.0 + t);
-  float d = abs(uv.y - y);
-  col += vec3(1.0, 0.66, 0.25) * (exp(-d * d / 0.00006) * 2.6 + exp(-d * d / 0.002) * 0.35);
-  vec2 q = abs(uv - 0.5) * 2.0;
-  col *= smoothstep(1.0, 0.86, max(pow(q.x, 6.0), pow(q.y, 6.0)));
-  gl_FragColor = vec4(col, 1.0);
-}`;
-
-function createScope(M) {
-  const g = new THREE.Group();
-  g.name = "scope";
-  const W = 0.21, H = 0.15, D = 0.23;
-  const body = box(W, H, D, new THREE.MeshStandardMaterial({ color: 0x1b2129, roughness: 0.45, metalness: 0.55 }), 0.008, 3);
-  body.position.y = H / 2 + 0.01;
-  g.add(body);
-  const fw = W - 0.012, fh = H - 0.012;
-  const front = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), new THREE.MeshStandardMaterial({ map: scopePanelTexture(), roughness: 0.6 }));
-  front.position.set(0, H / 2 + 0.01, D / 2 + 0.0006);
-  g.add(front);
-  const at = (px, py) => V((px / 512 - 0.5) * fw, H / 2 + 0.01 - (py / 360 - 0.5) * fh, D / 2);
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry((280 / 512) * fw, (210 / 360) * fh), new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
-    fragmentShader: SCOPE_FRAG,
-  }));
-  screen.position.copy(at(170, 135)).add(V(0, 0, 0.0012));
-  g.add(screen);
-  for (const [px, py, r] of [[375, 100, 0.012], [465, 100, 0.012], [375, 215, 0.009], [465, 215, 0.009]]) {
-    const k = knob3d(M, r, 0.012, 40 + px * 0.3);
-    k.rotation.x = Math.PI / 2;
-    k.position.copy(at(px, py));
-    g.add(k);
-  }
-  for (const px of [60, 160, 260]) {
-    const bnc = new THREE.Mesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.012, 16), M.steel);
-    bnc.rotation.x = Math.PI / 2;
-    bnc.position.copy(at(px, 268)).add(V(0, 0, 0.006));
-    g.add(bnc);
-  }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const f = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.009, 0.01, 12), M.black);
-    f.position.set(sx * (W / 2 - 0.02), 0.005, sz * (D / 2 - 0.025));
-    g.add(f);
-  }
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.005, 8, 24, Math.PI), M.black);
-  handle.position.set(0, H + 0.01, 0.02);
-  handle.rotation.y = Math.PI / 2;
-  g.add(handle);
-  shadow(g);
-  screen.castShadow = false;
-  return { group: g, update: (t) => { screen.material.uniforms.uTime.value = t; } };
 }
 
 // ---------------------------------------------------------------------------
@@ -553,22 +488,6 @@ function createSolderingStation(M) {
   return { group: g, update: (t, dt, c) => { smokeMat.uniforms.uTime.value = t; smokeMat.uniforms.uScale.value = c.heightPx; } };
 }
 
-function createSpool(M) {
-  const g = new THREE.Group();
-  g.name = "spool";
-  const prof = [[0, 0], [0.028, 0], [0.028, 0.004], [0.012, 0.005], [0.012, 0.031], [0.028, 0.032], [0.028, 0.036], [0, 0.036]].map(([x, y]) => new THREE.Vector2(x, y));
-  const sp = new THREE.Mesh(new THREE.LatheGeometry(prof, 40), new THREE.MeshStandardMaterial({ color: 0x2b3440, roughness: 0.5 }));
-  sp.rotation.x = Math.PI / 2; sp.position.set(0, 0.028, -0.018);
-  g.add(sp);
-  const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.026, 40), new THREE.MeshStandardMaterial({ color: 0xbfc4c6, roughness: 0.3, metalness: 1 }));
-  wire.rotation.x = Math.PI / 2; wire.position.set(0, 0.028, 0);
-  g.add(wire);
-  const tail = new THREE.CatmullRomCurve3([V(0.02, 0.04, 0.0), V(0.05, 0.02, 0.03), V(0.09, 0.001, 0.06), V(0.12, 0.001, 0.05)]);
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(tail, 30, 0.0007, 5), M.steel));
-  shadow(g);
-  return { group: g };
-}
-
 function createMug() {
   const g = new THREE.Group();
   g.name = "mug";
@@ -621,12 +540,8 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const sections = {};
   const place = (o, x, z, ry = 0, y = DESK.y) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
 
-  const scope = createScope(M);
-  place(scope.group, -0.83, 0.13, 0.42);
-  updaters.push(scope.update);
-
   const monitor = createMonitor(M, data);
-  place(monitor.group, -0.45, -0.2, 0.12);
+  place(monitor.group, -0.35, -0.2, 0.12);
   updaters.push(monitor.update);
   sections.dev = monitor.group;
 
@@ -667,8 +582,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const station = createSolderingStation(M);
   place(station.group, 0.12, 0.32, 0.15);
   updaters.push(station.update);
-  place(createSpool(M).group, 0.22, -0.3, 0.4);
-  place(createMug().group, 0.05, -0.2, 2.4);
+  place(createMug().group, 0.16, -0.22, 2.4);
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;
@@ -750,13 +664,9 @@ function createNeon() {
     new THREE.MeshStandardMaterial({ color: 0x140a00, emissive: 0xffa23c, emissiveIntensity: 2.4 }));
   strip.position.set(-0.44, Y + 0.004, DESK.z0 + 0.006);
   g.add(strip);
-  const glow = new THREE.PointLight(0xff6a3d, 0.06, 0.9, 2);
-  glow.position.set(0.61, 1.05, -0.42);
-  const amber = new THREE.PointLight(0xffa64a, 0.18, 1.0, 2);
-  amber.position.set(-0.2, Y + 0.12, -0.468);
   // luce morbida sugli strumenti: sono i prodotti, devono leggersi bene
   const key = new THREE.PointLight(0xffe2c2, 0.5, 1.7, 2);
   key.position.set(0.62, 1.32, 0.32);
-  g.add(glow, amber, key);
+  g.add(key);
   return { group: g, update(t) { mat.uniforms.uTime.value = t; } };
 }

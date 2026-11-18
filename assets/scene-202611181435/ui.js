@@ -125,7 +125,7 @@ export class UI {
 
   openPanel(view, { focus = true } = {}) {
     clearTimeout(this.closeTimer);
-    const build = { dev: () => this.devPanel(), shop: () => this.shopPanel(), about: () => this.aboutPanel(), contact: () => this.contactPanel(), lab: () => this.labPanel() }[view];
+    const build = { dev: () => this.devPanel(), shop: () => this.shopPanel(), about: () => this.aboutPanel(), contact: () => this.contactPanel(), lab: () => this.labPanel(), print: () => this.printPanel() }[view];
     if (!build) return;
     this.view = view;
     this.panelBody.replaceChildren(...build().filter(Boolean));
@@ -273,17 +273,22 @@ export class UI {
       h("p", {}, h("a", { class: "sp-direct sp-link", href: "mailto:" + c.email }, c.email)),
       c.whatsapp ? h("p", {}, h("a", { class: "sp-link", href: "https://wa.me/" + c.whatsapp }, "WhatsApp")) : null,
       h("div", { class: "sp-section" }, form),
+      h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, c.profile_h), h("p", {}, c.profile)),
     ];
   }
 
-  labPanel() {
-    const l = this.data.lab;
+  // scheda con testo, invito e un elenco di voci (Stampa 3D, Formazione)
+  itemsPanel(d, more) {
     return [
-      this.title(l.h),
-      ...l.p.map((p, i) => h("p", { class: i === 0 ? "lead" : null }, p)),
+      this.title(d.h),
+      ...[].concat(d.p).map((p, i) => h("p", { class: i === 0 ? "lead" : null }, p)),
       h("div", { class: "sp-actions" },
-        h("a", { class: "btn btn-primary", href: l.cta_href }, l.cta),
-        h("a", { class: "btn btn-secondary", href: l.more_href }, l.more)),
+        h("a", { class: "btn btn-primary", href: d.cta_href }, d.cta),
+        more ? h("a", { class: "btn btn-secondary", href: more.href }, more.label) : null),
+      h("div", { class: "sp-section" },
+        h("ul", { class: "sp-list" }, d.items.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
     ];
   }
+  labPanel() { const l = this.data.lab; return this.itemsPanel(l, { href: l.more_href, label: l.more }); }
+  printPanel() { return this.itemsPanel(this.data.print); }
 }

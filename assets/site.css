@@ -459,3 +459,29 @@ a:hover, .theme-dark a:hover { color: var(--sodio); }
 .product-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s3); }
 .product-gallery img { aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; }
 .render-note { font-size: 14px; color: var(--muted); margin-top: var(--s2); }
+
+/* Plancia della home: le quattro attivita' */
+.plancia { border-bottom: 1px solid var(--rule); }
+.plancia-grid { list-style: none; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.plancia-grid li { border-left: 1px solid var(--rule); }
+.plancia-grid li:first-child { border-left: 0; }
+.plancia-grid a { display: block; height: 100%; padding: var(--s6) var(--s5) var(--s7); text-decoration: none; color: var(--fg); border-top: 2px solid transparent; }
+.plancia-grid li:first-child a { padding-left: 0; }
+.plancia-grid a:hover { border-top-color: var(--sodio); color: var(--fg); }
+.plancia-grid .label { display: block; margin-bottom: var(--s3); }
+.plancia-title { display: block; font-size: clamp(21px, 1.9vw, 27px); font-weight: 800; font-stretch: 116%; line-height: 1.12; letter-spacing: -0.01em; text-wrap: balance; }
+.plancia-grid a:hover .plancia-title { color: var(--sodio); }
+.plancia-text { display: block; margin-top: var(--s3); font-size: 15.5px; line-height: 1.5; color: var(--muted); }
+.split-head > .label, .band-head .label { margin-bottom: var(--s3); }
+@media (max-width: 980px) {
+  .plancia-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plancia-grid li:nth-child(odd) { border-left: 0; }
+  .plancia-grid li:nth-child(odd) a { padding-left: 0; }
+  .plancia-grid li:nth-child(n+3) { border-top: 1px solid var(--rule); }
+}
+@media (max-width: 600px) {
+  .plancia-grid { grid-template-columns: 1fr; }
+  .plancia-grid li { border-left: 0; border-top: 1px solid var(--rule); }
+  .plancia-grid li:first-child { border-top: 0; }
+  .plancia-grid a { padding-left: 0; }
+}

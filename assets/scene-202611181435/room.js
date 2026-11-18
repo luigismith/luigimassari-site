@@ -364,13 +364,8 @@ export function createRoom(ctx) {
   moon.position.set(-0.6, 2.6, -3.2);
   moon.target.position.set(0.2, 0.75, 0.4);
   group.add(moon, moon.target);
-  const fill = new THREE.HemisphereLight(0x2c3466, 0x0b0710, 0.5);
+  const fill = new THREE.HemisphereLight(0x2c3466, 0x0b0710, 0.62);
   group.add(fill);
-  // la finestra stessa illumina appena il davanzale e il fondo del banco
-  const winGlow = new THREE.PointLight(0x5a7bb3, 0.35, 2.4, 2);
-  winGlow.position.set(cx, cy - 0.2, wallZ + 0.1);
-  group.add(winGlow);
-
   return {
     group,
     glass,

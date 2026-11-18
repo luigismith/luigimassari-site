@@ -209,6 +209,99 @@ function toolCup(M) {
   return g;
 }
 
+// stampante 3D chiusa, al lavoro: e' l'oggetto della sezione "Modellazione e stampa 3D"
+function printer(M) {
+  const g = new THREE.Group();
+  g.name = "printer";
+  const W = 0.34, H = 0.42, D = 0.34;
+  const base = box(W, 0.05, D, M.dark, 0.008, 2);
+  base.position.y = 0.025;
+  const top = box(W, 0.03, D, M.dark, 0.008, 2);
+  top.position.y = H - 0.015;
+  g.add(base, top);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const post = box(0.022, H - 0.08, 0.022, M.dark, 0.004, 1);
+    post.position.set(sx * (W / 2 - 0.011), H / 2, sz * (D / 2 - 0.011));
+    g.add(post);
+  }
+  // pannelli in vetro fume'
+  const glassMat = new THREE.MeshBasicMaterial({ color: 0x0a1018, transparent: true, opacity: 0.28, depthWrite: false });
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.044, H - 0.08), glassMat);
+  front.position.set(0, H / 2, D / 2 - 0.004);
+  const sideL = front.clone(); sideL.rotation.y = -Math.PI / 2; sideL.position.set(-W / 2 + 0.004, H / 2, 0);
+  const sideR = front.clone(); sideR.rotation.y = Math.PI / 2; sideR.position.set(W / 2 - 0.004, H / 2, 0);
+  for (const pane of [front, sideL, sideR]) pane.userData.noShadow = true;
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.044, H - 0.08), std(0x10141a, 0.6));
+  back.position.set(0, H / 2, -D / 2 + 0.004);
+  g.add(back, sideL, sideR, front);
+  // luce interna
+  const led = new THREE.Mesh(new THREE.BoxGeometry(W - 0.08, 0.004, 0.006), lit(2.6, 1.9, 1.1));
+  led.position.set(0, H - 0.034, D / 2 - 0.03);
+  g.add(led); // niente luce vera qui dentro: ogni luce puntiforme in piu' pesa su tutta la scena
+  // piatto e pezzo in stampa: un vaso arrivato a due terzi
+  const bed = box(0.24, 0.006, 0.24, std(0x2a2f36, 0.35, 0.6), 0.003, 1);
+  bed.position.y = 0.062;
+  const pts = [];
+  for (let i = 0; i <= 14; i++) { const t = i / 14; pts.push(new THREE.Vector2(0.03 + 0.022 * Math.sin(t * Math.PI * 1.15) + 0.004 * Math.sin(t * 16), t * 0.12)); }
+  const vase = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), new THREE.MeshStandardMaterial({ color: 0xffb44a, roughness: 0.55, side: THREE.DoubleSide, emissive: 0xff9a2a, emissiveIntensity: 0.35 }));
+  vase.position.y = 0.065;
+  g.add(bed, vase);
+  // ponte e carrello in movimento, con l'ugello caldo
+  const bridge = new THREE.Group();
+  bridge.userData.dynamic = true;
+  bridge.position.y = 0.221;
+  bridge.add(new THREE.Mesh(new THREE.BoxGeometry(W - 0.05, 0.012, 0.012), M.steel));
+  const head = new THREE.Group();
+  const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.005, 0.014, 10), M.steel);
+  nozzle.rotation.x = Math.PI; nozzle.position.y = -0.027;
+  const hot = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), lit(3, 1.2, 0.4));
+  hot.position.y = -0.034;
+  head.add(box(0.04, 0.04, 0.04, std(0x15181c, 0.5, 0.3), 0.006, 1), nozzle, hot);
+  bridge.add(head);
+  g.add(bridge);
+  // display frontale
+  const c = canvas(160, 56), x = c.getContext("2d");
+  x.fillStyle = "#1a1206"; x.fillRect(0, 0, 160, 56);
+  x.fillStyle = "#FFB44A"; x.font = `700 30px ${FONT}`; x.fillText("62%", 12, 38);
+  x.fillRect(84, 22, 40, 6); x.strokeStyle = "#FFB44A"; x.strokeRect(84.5, 22.5, 63, 5);
+  const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.0245), new THREE.MeshBasicMaterial({ map: tex(c, { mips: false }), color: new THREE.Color(1.3, 1.3, 1.3) }));
+  disp.position.set(-0.09, 0.025, D / 2 + 0.0006);
+  g.add(disp);
+  // bobina di filamento sul fianco
+  const spool = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.02, 12, 36), std(0xffb44a, 0.5));
+  spool.rotation.y = Math.PI / 2;
+  spool.position.set(W / 2 + 0.024, 0.2, -0.02);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 20), M.dark);
+  hub.rotation.z = Math.PI / 2;
+  hub.position.copy(spool.position);
+  g.add(spool, hub);
+  return { group: g, update(t) { head.position.x = Math.sin(t * 1.3) * 0.045; bridge.position.z = Math.cos(t * 0.9) * 0.03; } };
+}
+
+// due pezzi stampati accanto alla stampante: un ingranaggio e il guscio di una custodia
+function prints() {
+  const g = new THREE.Group();
+  g.name = "prints";
+  const shape = new THREE.Shape(), n = 12;
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2, r = i % 2 ? 0.026 : 0.032;
+    i ? shape.lineTo(Math.cos(a) * r, Math.sin(a) * r) : shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  shape.closePath();
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, 0.008, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const gear = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.01, bevelEnabled: false }), std(0xdfe3e0, 0.6));
+  gear.rotation.x = -Math.PI / 2;
+  gear.position.set(0, 0, 0.06);
+  const shell = box(0.07, 0.03, 0.05, std(0xffb44a, 0.55), 0.006, 2);
+  shell.position.set(0.01, 0.015, -0.03);
+  const cavity = box(0.058, 0.02, 0.038, std(0x7a4a12, 0.8), 0.004, 1);
+  cavity.position.set(0.01, 0.0225, -0.03);
+  g.add(gear, shell, cavity);
+  return g;
+}
+
 export function createExtras(data) {
   const M = {
     dark: std(0x1a1d22, 0.5, 0.3), steel: std(0x8e9399, 0.28, 1),
@@ -216,20 +309,29 @@ export function createExtras(data) {
   };
   const root = new THREE.Group();
   root.name = "extras";
-  const place = (o, x, z, ry = 0) => { o.position.set(x, DESK.y, z); o.rotation.y = ry; shadow(o); root.add(o); return o; };
+  const place = (o, x, z, ry = 0) => {
+    o.position.set(x, DESK.y, z); o.rotation.y = ry;
+    shadow(o);
+    o.traverse((c) => { if (c.userData.noShadow) c.castShadow = false; });
+    root.add(o);
+    return o;
+  };
+  const printerObj = printer(M);
+  place(printerObj.group, -0.9, 0.08, 0.28);
+  place(prints(), -0.63, 0.1, 0.4);
   place(midiKeyboard(M), 0.6, 0.335, 0.03);
   place(headphones(M), -0.6, 0.31, 0.5);
-  place(handheld(M, data.about.projects[0][0]), -0.13, 0.31, -0.2);
+  place(handheld(M, data.about.projects[0][0]), -0.2, 0.33, -0.2);
   place(cabinet(M), 1.035, -0.27, -0.1);
   place(breadboard(M), 0.27, 0.3, 0.25);
   place(multimeter(M), 0.97, 0.325, 0.35);
-  place(toolCup(M), 0.17, -0.15);
+  place(toolCup(M), 0.255, -0.14);
   const notes = new THREE.Group();
   notes.name = "notes";
   const block = box(0.05, 0.007, 0.05, std(0xe9a23b, 0.9), 0.0015, 1);
   block.position.y = 0.0035;
   notes.add(block);
-  place(notes, -0.115, 0.1, 0.12);
+  place(notes, -0.03, 0.32, 0.12);
   for (const child of root.children) mergeStatic(child);
-  return { group: root };
+  return { group: root, printer: printerObj.group, update: printerObj.update };
 }
