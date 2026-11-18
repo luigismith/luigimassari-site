@@ -1,5 +1,23 @@
 // Suono della scena con la Web Audio API: niente file audio.
-// Un tappeto sonoro morbido solo se l'utente sceglie "Suono si'"; ogni synth ha la sua frase.
+// Un sottofondo leggero solo se l'utente sceglie "Suono si'"; ogni synth ha la sua frase.
+//
+// Il sottofondo e' musica generativa, non un accordo tenuto: sette note morbide, ognuna con un suo
+// periodo (tutti diversi, fra 17 e 35 secondi), cosi' gli incontri fra le note non si ripetono mai uguali;
+// sotto, un fondo appena udibile che ogni venti secondi cambia accordo. Niente frequenze gravi e niente rumore.
+
+// Note (Re maggiore pentatonico): frequenza, periodo in secondi, primo ingresso, posizione stereo
+const LOOPS = [
+  [220.00, 19.7, 9.0, -0.15],   // La3
+  [293.66, 23.3, 2.0, 0.35],    // Re4
+  [329.63, 26.9, 6.5, -0.5],    // Mi4
+  [369.99, 31.1, 13.0, 0.1],    // Fa#4
+  [440.00, 17.3, 4.0, 0.55],    // La4
+  [493.88, 28.1, 17.0, -0.35],  // Si4
+  [587.33, 34.7, 11.0, 0.2],    // Re5
+];
+// Fondo: quattro accordi di due note che si danno il cambio (Re, Si minore, Sol, La)
+const CHORDS = [[293.66, 440.0], [246.94, 369.99], [196.0, 293.66], [220.0, 329.63]];
+const CHORD_EVERY = 20, CHORD_LEN = 27;
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -11,11 +29,12 @@ export class SceneAudio {
     this.ambience = null;
   }
 
-  init() {
+  // given: un contesto gia' pronto (serve alle prove con OfflineAudioContext)
+  init(given = null) {
     if (this.ctx) return true;
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return false;
-    const ctx = (this.ctx = new AC());
+    if (!given && !AC) return false;
+    const ctx = (this.ctx = given || new AC());
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18; comp.ratio.value = 4;
     this.master = ctx.createGain();
@@ -71,37 +90,107 @@ export class SceneAudio {
     g.exponentialRampToValueAtTime(to, t + 0.35);
   }
 
-  // --- ambiente: un tappeto sonoro morbido, niente rumore. Quinte aperte e una nona (ne' maggiore
-  // ne' minore), onde dolci, filtro che si muove piano, riverbero. Entra in cinque secondi, a volume basso.
-  startAmbience() {
+  // --- sottofondo generativo (vedi in testa al file). offline: secondi da scrivere subito, per le prove ---
+  startAmbience({ offline = 0 } = {}) {
     const ctx = this.ctx, t = ctx.currentTime;
     const out = ctx.createGain();
     out.gain.setValueAtTime(0.0001, t);
-    out.gain.exponentialRampToValueAtTime(0.06, t + 5);
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass"; lp.frequency.value = 700; lp.Q.value = 0.7;
-    lp.connect(out);
+    out.gain.exponentialRampToValueAtTime(0.4, t + 4);
     out.connect(this.master);
-    out.connect(this.verb);
-    const lfo = (freq, depth, param) => {
-      const o = ctx.createOscillator(); o.frequency.value = freq;
-      const d = ctx.createGain(); d.gain.value = depth;
-      o.connect(d).connect(param); o.start(t);
-    };
-    lfo(0.045, 260, lp.frequency);
-    // La2, Mi3, Si3, Mi4
-    [[110, 0.5], [164.81, 0.34], [246.94, 0.22], [329.63, 0.14]].forEach(([f, a], i) => {
-      const g = ctx.createGain();
-      g.gain.value = a;
-      g.connect(lp);
-      lfo(0.03 + i * 0.017, a * 0.45, g.gain); // ogni voce respira per conto suo
-      for (const [type, det] of [["sine", -4], ["triangle", 5]]) {
-        const o = ctx.createOscillator();
-        o.type = type; o.frequency.value = f; o.detune.value = det;
-        o.connect(g); o.start(t);
+    // riverbero lungo e scuro, solo per il sottofondo: e' la coda delle note a riempire i silenzi
+    const len = Math.floor(ctx.sampleRate * 4.2);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        lp += (Math.random() * 2 - 1 - lp) * 0.3;
+        d[i] = lp * Math.pow(1 - i / len, 2.4);
       }
-    });
+    }
+    const hall = ctx.createConvolver();
+    hall.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    hall.connect(wet).connect(out);
+    const notes = ctx.createGain();
+    notes.connect(out);
+    notes.connect(hall);
+    const padLp = ctx.createBiquadFilter();
+    padLp.type = "lowpass"; padLp.frequency.value = 1100; padLp.Q.value = 0.5;
+    const pad = ctx.createGain();
+    pad.connect(padLp).connect(out);
+    padLp.connect(hall);
+    this.amb = { notes, pad, t0: t + 0.3, until: t };
+    if (offline) this.scheduleAmbience(t, t + offline);
+    else {
+      this.pumpAmbience();
+      this.ambTimer = setInterval(() => this.pumpAmbience(), 2000);
+    }
     return out;
+  }
+
+  // prepara gli eventi dei prossimi secondi (se l'audio e' in pausa il tempo e' fermo e non si accumula nulla)
+  pumpAmbience() {
+    if (this.ctx.state !== "running") return;
+    this.scheduleAmbience(this.amb.until, this.ctx.currentTime + 8);
+  }
+
+  scheduleAmbience(from, to) {
+    const A = this.amb;
+    from = Math.max(from, this.ctx.currentTime); // niente eventi nel passato: suonerebbero tutti insieme
+    if (to <= from) return;
+    for (const [freq, period, first, pan] of LOOPS) {
+      for (let k = Math.max(0, Math.ceil((from - A.t0 - first) / period)); A.t0 + first + k * period < to; k++) {
+        const r = Math.random();
+        if (r < 0.1) continue;                                   // ogni tanto una nota manca
+        const high = r > 0.86;                                   // ogni tanto suona un'ottava sopra, piu' piano
+        this.softNote(A.t0 + first + k * period, high ? freq * 2 : freq, (high ? 0.45 : 0.7) + Math.random() * 0.3, pan);
+      }
+    }
+    for (let i = Math.max(0, Math.ceil((from - A.t0) / CHORD_EVERY)); A.t0 + i * CHORD_EVERY < to; i++) {
+      this.padChord(A.t0 + i * CHORD_EVERY, CHORDS[i % CHORDS.length]);
+    }
+    A.until = to;
+  }
+
+  // nota morbida, tra il piano elettrico e una goccia: attacco dolce, coda lunga, armoniche che si spengono presto
+  softNote(t, freq, vel, pan) {
+    const ctx = this.ctx, dur = 6;
+    const g = ctx.createGain(), p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    const peak = 0.2 * vel;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(peak * 0.32, t + 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (const [mult, amp] of [[1, 1], [2, 0.2], [3, 0.05]]) {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.frequency.value = freq * mult;
+      o.detune.value = (Math.random() - 0.5) * 8;
+      og.gain.setValueAtTime(amp, t);
+      if (mult > 1) og.gain.exponentialRampToValueAtTime(amp * 0.04, t + 1.1);
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + dur + 0.1);
+    }
+    g.connect(p).connect(this.amb.notes);
+  }
+
+  // accordo del fondo: entra in nove secondi, resta, esce mentre entra il successivo
+  padChord(t, freqs) {
+    const ctx = this.ctx, g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(1, t + 9);
+    g.gain.setValueAtTime(1, t + 15);
+    g.gain.linearRampToValueAtTime(0, t + CHORD_LEN);
+    for (const f of freqs) for (const det of [-4, 4]) {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.frequency.value = f; o.detune.value = det;                // due voci appena scordate: il suono si muove piano
+      og.gain.value = 0.02;
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + CHORD_LEN + 0.1);
+    }
+    g.connect(this.amb.pad);
   }
 
   // --- frasi degli strumenti ---
