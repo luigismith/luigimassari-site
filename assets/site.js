@@ -2,6 +2,24 @@
 (function () {
   "use strict";
 
+  // Tema chiaro o scuro: la scelta resta salvata nel browser. La scena 3D ascolta l'evento "lm-theme".
+  (function () {
+    var root = document.documentElement;
+    var btns = Array.prototype.slice.call(document.querySelectorAll("[data-theme-toggle]"));
+    function current() { return root.dataset.theme === "light" ? "light" : "dark"; }
+    function paint() { // il pulsante mostra il tema a cui si passa
+      btns.forEach(function (b) { b.textContent = current() === "light" ? b.dataset.labelDark : b.dataset.labelLight; });
+    }
+    function set(theme) {
+      if (theme === "light") root.dataset.theme = "light"; else delete root.dataset.theme;
+      try { localStorage.setItem("lm-theme", theme); } catch (e) { /* storage bloccato */ }
+      paint();
+      window.dispatchEvent(new CustomEvent("lm-theme", { detail: theme }));
+    }
+    btns.forEach(function (b) { b.addEventListener("click", function () { set(current() === "light" ? "dark" : "light"); }); });
+    paint();
+  })();
+
   // Navigazione "sintonia": l'ago va sulla stazione corrente, o su quella sotto il puntatore o il focus
   function initTuner(nav) {
     var needle = nav.querySelector(".tuner-needle");

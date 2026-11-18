@@ -1,6 +1,6 @@
-// Stanza: pareti scure, vetrata panoramica sul Mar Piccolo con pioggia sul vetro, poster ICHOS.
+// Stanza: pareti scure e vetrata panoramica sul Mar Piccolo con pioggia sul vetro.
 import * as THREE from "three";
-import { plasterTextures, posterTexture } from "./textures.js";
+import { plasterTextures } from "./textures.js";
 
 export const ROOM = {
   wallZ: -0.5, left: -1.6, right: 1.3, height: 2.7,
@@ -24,6 +24,7 @@ precision highp float;
 uniform float uTime;
 uniform vec2 uSize;
 uniform float uRain;
+uniform float uDay;   // 0 = notte (tema scuro), 1 = giorno (tema chiaro)
 varying vec2 vUv;
 varying vec3 vWorld;
 
@@ -187,6 +188,33 @@ vec3 outside(vec3 dir, float blur, float t) {
   return col;
 }
 
+// --- lo stesso panorama di giorno, con cielo coperto ---
+vec3 daySky(float az, float el, float t) {
+  float h = max(el - HOR, 0.0);
+  vec3 col = mix(vec3(0.60, 0.65, 0.69), vec3(0.34, 0.44, 0.58), smoothstep(0.0, 0.45, h));
+  float c = fbm(vec2(az * 3.2 - t * 0.012, el * 9.0 + 2.0));
+  return mix(col, vec3(0.72, 0.74, 0.76), smoothstep(0.42, 0.78, c) * 0.7);
+}
+vec3 dayOutside(vec3 dir, float blur, float t) {
+  float az = atan(dir.x, -dir.z);
+  float el = asin(clamp(dir.y, -1.0, 1.0));
+  vec3 col = vec3(0.0);
+  if (el < HOR) {
+    float dep = max(HOR - el, 0.0004);
+    vec2 wp = vec2(az / dep, 1.0 / dep);
+    float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
+    col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
+    col = mix(col, daySky(az, HOR + dep, t), 0.25);
+  } else {
+    float ce = coast(az);
+    float edge = 0.0012 + blur * 0.002;
+    float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
+    vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR));
+    col = mix(daySky(az, el, t), hill, land);
+  }
+  return col;
+}
+
 // --- pioggia sul vetro (p in metri) ---
 // restituisce: xy = deviazione della vista, z = quanto e' pulito il vetro (gocce e scie)
 vec3 slidingDrops(vec2 p, float t, float scale) {
@@ -245,11 +273,16 @@ void main() {
   // le gocce fanno da lenti: deviano (e capovolgono) la vista
   dir = normalize(dir - vec3(off.x * 9.0, off.y * 9.0, 0.0));
   float blur = mix(1.0, 0.15, clear);
+  // MODE: 0 = notte, 1 = giorno: due varianti dello shader, ogni tema calcola solo il suo panorama
+#if MODE == 0
   vec3 col = outside(dir, blur, t);
+#else
+  vec3 col = dayOutside(dir, blur, t);
+#endif
 
   // vetro appannato: foschia fredda dove non passano gocce
   float fog = 0.32 * (1.0 - clear) * uRain;
-  vec3 fogCol = vec3(0.016, 0.020, 0.028) + col * 0.4;
+  vec3 fogCol = mix(vec3(0.016, 0.020, 0.028), vec3(0.30, 0.33, 0.35), uDay) + col * 0.4;
   col = mix(col, fogCol, fog);
   // bordo delle gocce: leggero scuro + riflesso della lampada in alto a sinistra
   float rim = smoothstep(0.55, 1.0, length(off) * 45.0) * clear;
@@ -261,16 +294,19 @@ void main() {
 
 export function createGlass() {
   const w = ROOM.win.x1 - ROOM.win.x0, h = ROOM.win.y1 - ROOM.win.y0;
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: GLASS_VERT,
-    fragmentShader: GLASS_FRAG,
-    uniforms: { uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 } },
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  // due varianti dello stesso shader con le stesse uniform: notte e giorno
+  const uniforms = { uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 } };
+  const variants = [0, 1].map((MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms, defines: { MODE } }));
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), variants[0]);
+  mesh.userData.variants = variants;
   mesh.position.set((ROOM.win.x0 + ROOM.win.x1) / 2, (ROOM.win.y0 + ROOM.win.y1) / 2, ROOM.glassZ);
   mesh.name = "glass";
   return mesh;
 }
+
+const C3 = (hex) => new THREE.Color(hex);
+const NIGHT = { moon: C3(0x5f86d8), sky: C3(0x2c3466), ground: C3(0x0b0710), floor: C3(0x17130f), ceil: C3(0x1d2026) };
+const DAY = { moon: C3(0xfff3e2), sky: C3(0xd5dee8), ground: C3(0x8f887b), floor: C3(0x6b6156), ceil: C3(0xc4c9cc) };
 
 export function createRoom(ctx) {
   const { ui } = ctx;
@@ -305,12 +341,14 @@ export function createRoom(ctx) {
   leftWall.position.set(left, height / 2, wallZ + 1.6);
   group.add(leftWall);
 
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.8 }));
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.8 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set((left + right) / 2, 0, wallZ + 1.7);
   floor.receiveShadow = true;
   group.add(floor);
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), new THREE.MeshStandardMaterial({ color: 0x1d2026, roughness: 1 }));
+  const ceilMat = new THREE.MeshStandardMaterial({ color: 0x1d2026, roughness: 1 });
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), ceilMat);
   ceil.rotation.x = Math.PI / 2;
   ceil.position.set((left + right) / 2, height, wallZ + 1.7);
   group.add(ceil);
@@ -345,20 +383,6 @@ export function createRoom(ctx) {
   cove.position.set(cx, win.y1 + 0.03, wallZ + 0.004);
   group.add(cove);
 
-  // poster ICHOS sulla parete destra
-  const pw = 0.52, ph = pw * 1088 / 768;
-  const poster = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ map: posterTexture(ui), roughness: 0.82 }));
-  poster.rotation.y = -Math.PI / 2;
-  poster.position.set(right - 0.004, 1.62, -0.05);
-  poster.receiveShadow = true;
-  group.add(poster);
-  // cornice sottile in metallo
-  for (const [dy, dz, h2, w2] of [[ph / 2, 0, 0.012, pw + 0.024], [-ph / 2, 0, 0.012, pw + 0.024], [0, -pw / 2, ph, 0.012], [0, pw / 2, ph, 0.012]]) {
-    const f = new THREE.Mesh(new THREE.BoxGeometry(0.012, h2, w2), frameMat);
-    f.position.set(right - 0.008, 1.62 + dy, -0.05 + dz);
-    group.add(f);
-  }
-
   // luce fredda dalla finestra
   const moon = new THREE.DirectionalLight(0x5f86d8, 0.6);
   moon.position.set(-0.6, 2.6, -3.2);
@@ -369,7 +393,21 @@ export function createRoom(ctx) {
   return {
     group,
     glass,
-    poster,
+    // k: 0 = notte, 1 = giorno. Di giorno entra luce chiara dalla vetrata e le pareti schiariscono.
+    setDay(k) {
+      const L = THREE.MathUtils.lerp;
+      glass.material = glass.userData.variants[k < 0.5 ? 0 : 1];
+      glass.material.uniforms.uDay.value = k;
+      moon.color.lerpColors(NIGHT.moon, DAY.moon, k);
+      moon.intensity = L(0.6, 1.4, k);
+      fill.color.lerpColors(NIGHT.sky, DAY.sky, k);
+      fill.groundColor.lerpColors(NIGHT.ground, DAY.ground, k);
+      fill.intensity = L(0.62, 1.9, k);
+      wallMat.color.setScalar(L(1, 3.3, k));
+      floorMat.color.lerpColors(NIGHT.floor, DAY.floor, k);
+      ceilMat.color.lerpColors(NIGHT.ceil, DAY.ceil, k);
+      cove.material.color.setRGB(L(2.2, 0.9, k), L(1.3, 0.6, k), L(0.45, 0.3, k));
+    },
     update(t) {
       glass.material.uniforms.uTime.value = t;
     },

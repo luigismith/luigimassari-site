@@ -302,6 +302,60 @@ function prints() {
   return g;
 }
 
+// richiami anni '60: lampada a fungo, base arancio lucida e cupola opalina accesa
+function mushroomLamp() {
+  const g = new THREE.Group();
+  g.name = "mushroom";
+  const prof = [[0, 0], [0.05, 0], [0.052, 0.006], [0.03, 0.016], [0.014, 0.05], [0.012, 0.12], [0.02, 0.135], [0, 0.135]].map(([x, y]) => new THREE.Vector2(x, y));
+  g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 40), new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.22, metalness: 0.05 })));
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.085, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xfff4e0, emissive: 0xffc98a, emissiveIntensity: 1.25, roughness: 0.4 }));
+  dome.scale.y = 0.72;
+  dome.position.y = 0.125;
+  const under = new THREE.Mesh(new THREE.CircleGeometry(0.085, 40), lit(1.6, 1.1, 0.6));
+  under.rotation.x = Math.PI / 2;
+  under.position.y = 0.1255;
+  g.add(dome, under);
+  return g;
+}
+
+// televisore sferico su una mensola: sullo schermo il programma della Formazione (e' l'oggetto di quella sezione)
+function sphereTv(M, lab) {
+  const g = new THREE.Group();
+  g.name = "tv";
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.13, 48, 32), new THREE.MeshStandardMaterial({ color: 0xece7da, roughness: 0.28, metalness: 0.05 }));
+  shell.scale.z = 0.92;
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.105, 0.03, 48), std(0x0b0f14, 0.3, 0.2));
+  face.rotation.x = Math.PI / 2;
+  face.position.z = 0.117;
+  const c = canvas(512, 384), x = c.getContext("2d");
+  x.fillStyle = "#0A1622"; x.fillRect(0, 0, 512, 384);
+  x.fillStyle = "#FFB44A"; x.font = `800 46px ${FONT}`;
+  let line = "", y = 76;
+  for (const word of lab.h.split(" ")) {
+    if (line && x.measureText(line + " " + word).width > 440) { x.fillText(line, 36, y); y += 52; line = word; } else line = line ? line + " " + word : word;
+  }
+  x.fillText(line, 36, y);
+  y += 62;
+  x.font = `600 30px ${FONT}`;
+  for (const [title] of lab.items) {
+    x.fillStyle = "#FFB44A"; x.beginPath(); x.arc(46, y - 10, 7, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#EEF1EC"; x.fillText(title, 68, y);
+    y += 50;
+  }
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.1125), new THREE.MeshBasicMaterial({ map: tex(c, { mips: false }), color: new THREE.Color(1.3, 1.3, 1.3) }));
+  screen.position.z = 0.1325;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.006, 10, 48), std(0xff6a1a, 0.25));
+  ring.position.z = 0.129;
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 32), M.dark);
+  foot.position.y = -0.14;
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.17, 6), M.steel);
+  antenna.position.set(0.04, 0.2, -0.02);
+  antenna.rotation.z = -0.35;
+  g.add(shell, face, screen, ring, foot, antenna);
+  return g;
+}
+
 export function createExtras(data) {
   const M = {
     dark: std(0x1a1d22, 0.5, 0.3), steel: std(0x8e9399, 0.28, 1),
@@ -332,6 +386,15 @@ export function createExtras(data) {
   block.position.y = 0.0035;
   notes.add(block);
   place(notes, -0.03, 0.32, 0.12);
+  place(mushroomLamp(), -0.665, -0.31); // tra la stampante e il monitor
+  const tv = sphereTv(M, data.lab);
+  tv.position.set(1.14, 1.3, -0.02);
+  tv.rotation.y = -0.75;
+  shadow(tv);
+  const shelf = box(0.3, 0.02, 0.26, M.dark, 0.004, 1);
+  shelf.position.set(1.15, 1.135, -0.02);
+  shadow(shelf);
+  root.add(tv, shelf);
   for (const child of root.children) mergeStatic(child);
-  return { group: root, printer: printerObj.group, update: printerObj.update };
+  return { group: root, printer: printerObj.group, tv, update: printerObj.update };
 }

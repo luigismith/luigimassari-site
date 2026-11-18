@@ -19,7 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=202611181435">
+<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181522">
 
 
 
@@ -32,13 +33,14 @@
     <nav id="nav" class="tuner" aria-label="Site sections" data-tuner>
       <ul>
         <li><a href="/en/consulting/" data-station="dev">IT and AI consulting</a></li>
-        <li><a href="/en/#3d-printing" data-station="print">3D printing</a></li>
+        <li><a href="/en/#3d-printing" data-station="print">3D printing and laser</a></li>
         <li><a href="/en/elettrofoni/" data-station="shop">Instruments</a></li>
         <li><a href="/en/#training" data-station="lab">Training</a></li>
         <li><a href="/en/contact/" data-station="contact">Contact</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
+    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Light" data-label-dark="Dark" title="Switch between the dark and the light theme">Light</button>
     <a class="lang" href="/privacy/" hreflang="it" lang="it">Italiano</a>
   </div>
 </header>
@@ -76,12 +78,12 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">IT and AI consulting, 3D printing, electronic musical instruments and training, from Taranto, Italy.</p>
+      <p class="muted">IT and AI consulting, 3D printing and laser cutting, electronic musical instruments and training, from Taranto, Italy.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
       
-      <a href="https://github.com/luigismith">GitHub</a>
+      <a href="https://github.com/luigismith" target="_blank" rel="noopener">GitHub<span class="visually-hidden"> (opens in a new tab)</span></a>
       <a href="/en/privacy/">Privacy</a>
       <a href="/en/terms-of-sale/">Terms of sale</a>
     </div>
@@ -91,6 +93,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181435" defer></script>
+<script src="/assets/site.js?v=202611181522" defer></script>
 </body>
 </html>

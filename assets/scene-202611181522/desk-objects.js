@@ -232,7 +232,7 @@ function createMonitor(M, data) {
   }
   keys.setMatrixAt(n++, new THREE.Matrix4().compose(V(0, 0.019, 0.055), new THREE.Quaternion(), V(5.5, 1, 1)));
   kb.add(keys);
-  kb.position.set(0.02, 0, 0.29);
+  kb.position.set(-0.06, 0, 0.29);
   kb.rotation.y = -0.07;
   g.add(kb);
   const glow = new THREE.PointLight(0x8fb2e8, 0.5, 1.4, 2);
@@ -492,7 +492,7 @@ function createMug() {
   const g = new THREE.Group();
   g.name = "mug";
   const prof = [[0.0, 0.01], [0.035, 0.01], [0.036, 0.088], [0.038, 0.092], [0.041, 0.09], [0.04, 0.004], [0.036, 0.0], [0.0, 0.0]].map(([x, y]) => new THREE.Vector2(x, y));
-  const glaze = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.22, metalness: 0.05, side: THREE.DoubleSide });
+  const glaze = new THREE.MeshStandardMaterial({ color: 0xe9e4d6, roughness: 0.22, metalness: 0.05, side: THREE.DoubleSide });
   g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 48), glaze));
   const coffee = new THREE.Mesh(new THREE.CircleGeometry(0.035, 32), new THREE.MeshStandardMaterial({ color: 0x1a0e07, roughness: 0.12 }));
   coffee.rotation.x = -Math.PI / 2; coffee.position.y = 0.07;
@@ -500,7 +500,7 @@ function createMug() {
   const handle = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.0065, 12, 24, Math.PI * 1.1), glaze);
   handle.rotation.z = -Math.PI / 2 - 0.05; handle.position.set(0.04, 0.047, 0);
   g.add(handle);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 20), new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.3 }));
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 20), new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.3 }));
   dot.position.set(0, 0.055, 0.0412);
   g.add(dot);
   shadow(g);
@@ -541,12 +541,12 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const place = (o, x, z, ry = 0, y = DESK.y) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
 
   const monitor = createMonitor(M, data);
-  place(monitor.group, -0.35, -0.2, 0.12);
+  place(monitor.group, -0.15, -0.2, 0.12); // a destra della stampante 3D, che altrimenti lo copre
   updaters.push(monitor.update);
   sections.dev = monitor.group;
 
   const pad = createTablet(M, data);
-  place(pad.group, 0.05, 0.13, -0.1);
+  place(pad.group, 0.11, 0.13, -0.1);
   sections.about = pad.group;
   onProgress(0.3);
 
@@ -582,7 +582,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const station = createSolderingStation(M);
   place(station.group, 0.12, 0.32, 0.15);
   updaters.push(station.update);
-  place(createMug().group, 0.16, -0.22, 2.4);
+  place(createMug().group, 0.14, -0.08, 2.4);
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;

@@ -145,65 +145,6 @@ export function plasterTextures(seed = 3) {
   return { map: tex(c, { repeat: [4, 3], mirror: true }), bumpMap: tex(bump, { srgb: false, repeat: [4, 3], mirror: true }) };
 }
 
-// --- poster "ICHOS — Suoni a margine" -------------------------------------
-export function posterTexture(ui) {
-  const W = 768, H = 1088, c = canvas(W, H), g = c.getContext("2d"), r = rng(21);
-  g.fillStyle = "#E6E1D3"; g.fillRect(0, 0, W, H);
-  // carta: leggere macchie
-  for (let i = 0; i < 2600; i++) {
-    g.fillStyle = `rgba(90,70,40,${r() * 0.035})`;
-    g.fillRect(r() * W, r() * H, 1 + r() * 3, 1 + r() * 3);
-  }
-  const M = 34; // margine di carta
-  // onde concentriche: il suono che si allarga "a margine" (solo nella parte alta)
-  g.save();
-  g.beginPath(); g.rect(250 + M, M, W - 250 - M * 2, H - 330); g.clip();
-  g.translate(W * 0.70, H * 0.40);
-  for (let i = 0; i < 24; i++) {
-    g.strokeStyle = i % 5 === 0 ? RED : INK;
-    g.globalAlpha = i % 5 === 0 ? 0.95 : 0.5 - i * 0.012;
-    g.lineWidth = i % 5 === 0 ? 5 : 2;
-    g.beginPath();
-    const rad = 26 + i * 19;
-    for (let a = 0; a <= Math.PI * 2 + 0.01; a += 0.03) {
-      const wob = Math.sin(a * 6 + i * 0.7) * (i * 0.5);
-      const px = Math.cos(a) * (rad + wob), py = Math.sin(a) * (rad + wob) * 0.92;
-      a === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
-    }
-    g.stroke();
-  }
-  g.restore();
-  g.globalAlpha = 1;
-  // fascia scura con il titolo, dentro il margine di carta
-  g.fillStyle = INK; g.fillRect(M, M, 230, H - M * 2);
-  g.save();
-  g.translate(M + 182, H - M - 40); g.rotate(-Math.PI / 2);
-  g.fillStyle = "#F1F2EE";
-  g.font = `800 196px ${FONT}`;
-  try { g.fontStretch = "expanded"; } catch (e) { /* non supportato */ }
-  g.fillText(ui.poster_title, 0, 0);
-  g.restore();
-  g.fillStyle = RED; g.beginPath(); g.arc(M + 115, M + 60, 20, 0, Math.PI * 2); g.fill();
-  // testi a destra
-  const X = 300;
-  g.fillStyle = "#E6E1D3"; g.fillRect(X - 10, M + 70, 330, 170);
-  g.fillStyle = INK;
-  try { g.fontStretch = "normal"; } catch (e) { /* */ }
-  g.font = `800 58px ${FONT}`;
-  g.fillText(ui.poster_sub.split(" ")[0], X, 150);
-  g.fillText(ui.poster_sub.split(" ").slice(1).join(" "), X, 214);
-  g.fillStyle = RED; g.fillRect(X, 238, 120, 8);
-  g.fillStyle = INK; g.fillRect(X, H - 300, W - X - M - 10, 3);
-  g.font = `600 30px ${FONT}`;
-  const ls = ui.poster_lines;
-  g.fillText(ls[0], X, H - 240); g.fillText(ls[1], X, H - 202);
-  g.font = `800 44px ${FONT}`;
-  g.fillText(ls[2], X, H - 126);
-  g.font = `600 34px ${FONT}`;
-  g.fillText(ls[3], X, H - 82);
-  return tex(c);
-}
-
 // --- texture per piccoli oggetti ------------------------------------------
 export function noiseRoughness(seed = 5, base = 140, spread = 50) {
   const S = 128, c = canvas(S, S), g = c.getContext("2d"), r = rng(seed);
@@ -253,55 +194,48 @@ export function creaSequencer(ctx, uscita) {
 `,
   },
   {
-    name: "alloggi.py",
+    name: "documenti.py",
     lang: "py",
-    text: `# alloggi.py — scadenze dei contratti degli alloggi aziendali
+    text: `# documenti.py — cerca nei documenti dell'archivio e cita la fonte
 from dataclasses import dataclass
-from datetime import date, timedelta
 
 
 @dataclass
-class Contratto:
-    alloggio: str
-    inquilino: str
-    fine: date
-    firmato: bool = False
+class Brano:
+    documento: str
+    pagina: int
+    testo: str
 
 
-def in_scadenza(contratti, giorni=30):
-    """Contratti che scadono entro \`giorni\`, i piu' vicini per primi."""
-    oggi = date.today()
-    limite = oggi + timedelta(days=giorni)
-    vicini = [c for c in contratti if oggi <= c.fine <= limite]
-    return sorted(vicini, key=lambda c: c.fine)
+def cerca(domanda, archivio, quanti=3):
+    """I brani piu' vicini alla domanda, con documento e pagina."""
+    punteggi = [(somiglianza(domanda, b.testo), b) for b in archivio]
+    migliori = sorted(punteggi, key=lambda x: x[0], reverse=True)[:quanti]
+    return [b for _, b in migliori]
 
 
-def promemoria(contratti):
-    # una riga per contratto, pronta per la mail del lunedi'
-    for c in in_scadenza(contratti):
-        stato = "firmato" if c.firmato else "da firmare"
-        yield f"{c.alloggio}: {c.inquilino}, scade il {c.fine:%d/%m} ({stato})"
+def rispondi(domanda, archivio):
+    # la risposta usa solo i brani trovati: niente invenzioni
+    fonti = cerca(domanda, archivio)
+    citazioni = [f"{b.documento}, p. {b.pagina}" for b in fonti]
+    return componi(domanda, fonti), citazioni
 `,
   },
   {
-    name: "preventivo.ts",
+    name: "automazione.ts",
     lang: "js",
-    text: `// preventivo.ts — prezzo fisso, concordato prima di iniziare
-type Voce = { descrizione: string; giorni: number };
+    text: `// automazione.ts — dal modulo compilato al gestionale, senza ricopiare
+type Richiesta = { nome: string; reparto: string; testo: string };
 
-const TARIFFA_GIORNO = 0; // la tariffa e' quella della proposta firmata
-
-export function totale(voci: Voce[]): number {
-  // niente sorprese: si somma solo quello che e' scritto
-  return voci.reduce((somma, v) => somma + v.giorni * TARIFFA_GIORNO, 0);
+export async function smista(r: Richiesta) {
+  // la categoria la propone l'assistente AI, una persona la conferma
+  const categoria = await classifica(r.testo);
+  const scheda = await gestionale.crea({ ...r, categoria });
+  await avvisa(r.reparto, "Nuova richiesta: " + scheda.numero);
+  return scheda;
 }
 
-export const fasi: Voce[] = [
-  { descrizione: "Chiamata conoscitiva", giorni: 0 },
-  { descrizione: "Proposta a prezzo fisso", giorni: 1 },
-  { descrizione: "Sviluppo con anteprime", giorni: 12 },
-  { descrizione: "Consegna e formazione", giorni: 2 },
-];
+export const passaggi = ["modulo", "classifica", "conferma", "gestionale"];
 `,
   },
 ];

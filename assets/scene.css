@@ -309,3 +309,68 @@ html.scene-mode body > .site-footer { visibility: hidden; }
   .sp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sp-list li, .sp-doors a { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ===========================================================================
+   Tema dell'interfaccia sopra la scena: scuro (notte) o chiaro (giorno).
+   Qui si ridichiarano solo i colori, tramite variabili: nel tema scuro i valori sono quelli di sempre.
+   =========================================================================== */
+.scene {
+  --sc-veil: 10 22 34; --sc-ink: 5 11 18;
+  --sc-text: #EEF1EC; --sc-muted: #9DB0BF; --sc-lead: #C9D4DC;
+  --sc-line: rgba(157, 176, 191, .22); --sc-chip: rgba(10, 22, 34, .93); --sc-chip-line: rgba(238, 241, 236, .3);
+  --sc-accent: #FFB44A; --sc-intro-a: .15; --sc-intro-b: .6;
+}
+:root[data-theme="light"] .scene {
+  --sc-veil: 238 240 234; --sc-ink: 238 240 234;
+  --sc-text: #14202B; --sc-muted: #4F5E6B; --sc-lead: #2A3742;
+  --sc-line: rgba(20, 32, 43, .2); --sc-chip: rgba(238, 240, 234, .94); --sc-chip-line: rgba(20, 32, 43, .35);
+  --sc-accent: #9A5200; --sc-intro-a: .55; --sc-intro-b: .82;
+}
+.scene { background: rgb(var(--sc-ink)); color: var(--sc-text); }
+.scene-bar { background: linear-gradient(to bottom, rgb(var(--sc-ink) / .86), rgb(var(--sc-ink) / 0)); }
+.scene-wordmark, .scene-wordmark:hover { color: var(--sc-text); }
+.scene-bar .lang { background: rgb(var(--sc-veil) / .6); }
+.scene-tag, .scene-label { background: var(--sc-chip); color: var(--sc-text); border-color: var(--sc-chip-line); }
+.scene-label { box-shadow: 0 0 0 1px var(--sc-chip-line); }
+.scene-tag::after { background: var(--sc-muted); }
+.scene-tag:hover, .scene-tag:focus-visible { color: var(--sc-accent); border-color: var(--sc-accent); }
+.scene-label small { color: var(--sc-muted); }
+.scene-panel {
+  color: var(--sc-text);
+  background:
+    linear-gradient(90deg, rgb(var(--sc-veil) / .97) 0%, rgb(var(--sc-veil) / .9) 36%, rgb(var(--sc-veil) / .42) 62%, rgb(var(--sc-veil) / 0) 86%),
+    linear-gradient(0deg, rgb(var(--sc-veil) / .7) 0%, rgb(var(--sc-veil) / 0) 26%);
+}
+.scene-panel h2, .scene-panel h3, .sp-link, .sp-doors a, .sp-products button, .scene-back { color: var(--sc-text); }
+.scene-panel p, .sp-doors .dp, .scene-panel .kicker, .sp-section > h3.sp-h { color: var(--sc-muted); }
+.scene-panel .lead { color: var(--sc-lead); }
+.sp-list, .sp-list li, .sp-doors, .sp-doors a, .sp-products, .sp-products button { border-color: var(--sc-line); }
+.scene-back { border-color: var(--sc-chip-line); }
+.scene-back:hover, .sp-link:hover, .sp-doors a:hover .dh { color: var(--sc-accent); }
+.scene-back:hover { border-color: var(--sc-accent); }
+.sp-steps li { border-top-color: var(--sc-text); }
+.sp-steps .n { border-color: var(--sc-text); color: var(--sc-text); }
+.sp-card { background: rgb(var(--sc-veil) / .82); border-color: var(--sc-chip-line); color: var(--sc-text); }
+.sp-card p { color: var(--sc-muted); }
+.sp-card .price, .sp-card .status, .sp-card h3 { color: var(--sc-text); }
+.sp-card .btn-light { border-color: var(--sc-chip-line); color: var(--sc-text); }
+.scene-ctl { background: var(--sc-chip); color: var(--sc-text); border-color: var(--sc-chip-line); }
+.scene-intro { background: radial-gradient(ellipse at center, rgb(var(--sc-ink) / var(--sc-intro-a)), rgb(var(--sc-ink) / var(--sc-intro-b))); }
+.scene-intro-name, .scene-intro-line { color: var(--sc-text); }
+.scene-intro-hint, .scene-sound-choice span, .scene-intro-lofi { color: var(--sc-muted); }
+.scene-intro-lofi:hover { color: var(--sc-text); }
+.scene-sound-choice button { color: var(--sc-text); border-color: var(--sc-chip-line); }
+.scene-progress { background: rgb(var(--sc-veil) / .0); box-shadow: inset 0 0 0 1px var(--sc-line); }
+:root[data-theme="light"] .scene.is-intro .scene-canvas canvas { filter: blur(10px) brightness(1.02); }
+.scene-bar .tuner a { color: var(--sc-text); }
+.scene-bar .tuner a:hover, .scene-bar .tuner a[aria-current] { color: var(--sc-accent); }
+:root[data-theme="light"] .scene-panel {
+  background:
+    linear-gradient(90deg, rgb(var(--sc-veil) / .97) 0%, rgb(var(--sc-veil) / .94) 50%, rgb(var(--sc-veil) / .6) 68%, rgb(var(--sc-veil) / 0) 92%),
+    linear-gradient(0deg, rgb(var(--sc-veil) / .7) 0%, rgb(var(--sc-veil) / 0) 26%);
+}
+.scene-canvas canvas { transition: filter .9s ease, transform .9s ease, opacity .25s ease; }
+.scene.is-switching .scene-canvas canvas { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .scene-canvas canvas { transition: none; } }
+/* Tema chiaro: velatura della barra piu' piena, perche' le voci scure non si perdano sul telaio nero della vetrata */
+:root[data-theme="light"] .scene-bar { background: linear-gradient(to bottom, rgb(var(--sc-ink) / .94) 0%, rgb(var(--sc-ink) / .86) 55%, rgb(var(--sc-ink) / 0) 100%); padding-bottom: 28px; }

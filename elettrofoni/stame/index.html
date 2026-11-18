@@ -19,7 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=202611181435">
+<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181522">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Stame", "description": "Strumento ad accordi in un mobile di legno: tastiera, pulsantiera e console che fa da schermo.", "brand": {"@type": "Brand", "name": "Elettrofoni"}, "url": "https://luigimassari.com/elettrofoni/stame/", "image": "https://luigimassari.com/assets/og.png"}</script>
 
@@ -33,13 +34,14 @@
     <nav id="nav" class="tuner" aria-label="Sezioni del sito" data-tuner>
       <ul>
         <li><a href="/consulenza/" data-station="dev">Consulenza IT e AI</a></li>
-        <li><a href="/#stampa-3d" data-station="print">Stampa 3D</a></li>
+        <li><a href="/#stampa-3d" data-station="print">Stampa 3D e laser</a></li>
         <li><a href="/elettrofoni/" data-station="shop" aria-current="page">Strumenti</a></li>
         <li><a href="/#formazione" data-station="lab">Formazione</a></li>
         <li><a href="/contatti/" data-station="contact">Contatti</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
+    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Chiaro" data-label-dark="Scuro" title="Passa dal tema scuro al tema chiaro e viceversa">Chiaro</button>
     <a class="lang" href="/en/elettrofoni/stame/" hreflang="en" lang="en">English</a>
   </div>
 </header>
@@ -50,8 +52,8 @@
     <a class="back silk-link" href="/elettrofoni/">Tutti gli Elettrofoni</a>
     <div class="product-layout">
       <div class="product-art product-art-lg">
-        <img src="/assets/img/stame-sera.jpg?v=202611181435" alt="Rendering di Stame: mobile in legno con tastiera, pad, manopole, pulsantiera a tasti meccanici e console portatile con lo schermo acceso" width="1600" height="900">
-        <div class="product-gallery"><img src="/assets/img/stame-alto.jpg?v=202611181435" alt="Stame visto dall&#39;alto" loading="lazy" width="1200" height="675"><img src="/assets/img/stame-pad.jpg?v=202611181435" alt="Dettaglio della pulsantiera e delle manopole" loading="lazy" width="1200" height="675"><img src="/assets/img/stame-schermo.jpg?v=202611181435" alt="Lo schermo della console con l&#39;accordo in uso" loading="lazy" width="1200" height="675"></div>
+        <img src="/assets/img/stame-sera.jpg?v=202611181522" alt="Rendering di Stame: mobile in legno con tastiera, pad, manopole, pulsantiera a tasti meccanici e console portatile con lo schermo acceso" width="1600" height="900">
+        <div class="product-gallery"><img src="/assets/img/stame-alto.jpg?v=202611181522" alt="Stame visto dall&#39;alto" loading="lazy" width="1200" height="675"><img src="/assets/img/stame-pad.jpg?v=202611181522" alt="Dettaglio della pulsantiera e delle manopole" loading="lazy" width="1200" height="675"><img src="/assets/img/stame-schermo.jpg?v=202611181522" alt="Lo schermo della console con l&#39;accordo in uso" loading="lazy" width="1200" height="675"></div>
         <p class="render-note">Rendering del progetto.</p>
       </div>
       <div class="product-buy">
@@ -64,7 +66,7 @@
           <a class="btn btn-light" href="mailto:info@luigimassari.com?subject=Informazioni%20su%20Stame">Chiedi informazioni</a>
         </div>
         <p class="muted small">Spedizione tracciata. Tempi di consegna indicati al momento dell&#39;ordine.</p>
-        <p><a class="big-link" href="https://luigismith.github.io/stame/" rel="noopener">Sito del progetto<span aria-hidden="true"> ↗</span></a></p>
+        <p><a class="big-link" href="https://luigismith.github.io/stame/" target="_blank" rel="noopener">Sito del progetto<span aria-hidden="true"> ↗</span><span class="visually-hidden"> (si apre in una nuova scheda)</span></a></p>
       </div>
     </div>
     <div class="product-detail">
@@ -91,12 +93,12 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">Consulenza IT e AI, stampa 3D, strumenti musicali elettronici e formazione, da Taranto.</p>
+      <p class="muted">Consulenza IT e AI, stampa 3D e laser, strumenti musicali elettronici e formazione, da Taranto.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
       
-      <a href="https://github.com/luigismith">GitHub</a>
+      <a href="https://github.com/luigismith" target="_blank" rel="noopener">GitHub<span class="visually-hidden"> (si apre in una nuova scheda)</span></a>
       <a href="/privacy/">Privacy</a>
       <a href="/condizioni-di-vendita/">Condizioni di vendita</a>
     </div>
@@ -106,6 +108,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181435" defer></script>
+<script src="/assets/site.js?v=202611181522" defer></script>
 </body>
 </html>

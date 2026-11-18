@@ -14,6 +14,11 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
+// Link verso altri siti: si aprono in una nuova scheda, cosi' la scena resta aperta.
+// La freccia lo mostra a chi vede; il testo nascosto lo dice a chi usa un lettore di schermo.
+const EXT = { target: "_blank", rel: "noopener" };
+const extMark = (text) => [h("span", { "aria-hidden": "true" }, " ↗"), h("span", { class: "visually-hidden" }, " (" + text + ")")];
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export class UI {
@@ -196,7 +201,7 @@ export class UI {
     for (const b of this.productButtons) {
       if (b.dataset.slug === slug) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
     }
-    const primary = h("a", { class: "btn btn-primary", href: p.primary_href, rel: p.stripe ? "noopener" : null }, p.primary_label);
+    const primary = h("a", { class: "btn btn-primary", href: p.primary_href, rel: p.stripe ? "noopener" : null, target: p.stripe ? "_blank" : null }, p.primary_label);
     const card = h("article", { class: "sp-card", "aria-labelledby": "sp-card-h" },
       p.image ? h("img", { class: "sp-card-img", src: p.image, alt: p.image_alt, loading: "lazy" }) : null,
       h("p", { class: "status status-" + p.status }, p.status_label),
@@ -207,7 +212,7 @@ export class UI {
         primary,
         h("a", { class: "btn btn-light", href: p.url }, p.view_label),
       ),
-      p.site ? h("p", { class: "note" }, h("a", { href: p.site, rel: "noopener" }, p.site_label, h("span", { "aria-hidden": "true" }, " ↗"))) : null,
+      p.site ? h("p", { class: "note" }, h("a", { href: p.site, ...EXT }, p.site_label, extMark(this.data.ui.new_tab))) : null,
       h("p", { class: "note" }, h("a", { href: p.ask_href }, p.ask_label), " · ", this.data.shop.shipping));
     this.card.replaceChildren(card);
     this.announce(`${p.name}. ${p.status_label}. ${p.price_label}`);
@@ -227,7 +232,7 @@ export class UI {
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, a.projects_h),
         h("ul", { class: "sp-list" }, a.projects.map(([n, u, d]) => h("li", {},
-          h("h3", {}, h("a", { class: "sp-link", href: u, rel: "noopener" }, n, h("span", { "aria-hidden": "true" }, " ↗"))), h("p", {}, d))))),
+          h("h3", {}, h("a", { class: "sp-link", href: u, ...EXT }, n, extMark(this.data.ui.new_tab))), h("p", {}, d))))),
       a.cv ? h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: a.cv }, a.cv_label)) : null,
     ];
   }
@@ -271,7 +276,7 @@ export class UI {
       h("p", { class: "lead" }, c.p),
       h("p", { class: "kicker" }, c.direct),
       h("p", {}, h("a", { class: "sp-direct sp-link", href: "mailto:" + c.email }, c.email)),
-      c.whatsapp ? h("p", {}, h("a", { class: "sp-link", href: "https://wa.me/" + c.whatsapp }, "WhatsApp")) : null,
+      c.whatsapp ? h("p", {}, h("a", { class: "sp-link", href: "https://wa.me/" + c.whatsapp, ...EXT }, "WhatsApp", extMark(this.data.ui.new_tab))) : null,
       h("div", { class: "sp-section" }, form),
       h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, c.profile_h), h("p", {}, c.profile)),
     ];

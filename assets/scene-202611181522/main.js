@@ -18,26 +18,26 @@ import { SceneAudio } from "./audio.js";
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
   overview: { pos: V(-0.64, 1.6, 2.02), target: V(-0.02, 1.02, -0.14), fov: 41 },
-  dev: { pos: V(-0.26, 1.24, 1.5), target: V(-0.35, 1.07, -0.2), fov: 40 },
+  dev: { pos: V(-0.06, 1.24, 1.5), target: V(-0.15, 1.07, -0.2), fov: 40 },
   print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
   shop: { pos: V(0.6, 1.42, 0.98), target: V(0.6, 0.84, -0.04), fov: 40 },
-  about: { pos: V(0.0, 1.2, 0.5), target: V(0.05, 0.77, 0.06), fov: 40 },
+  about: { pos: V(0.06, 1.2, 0.5), target: V(0.11, 0.77, 0.06), fov: 40 },
   contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },
-  lab: { pos: V(0.25, 1.5, 0.05), target: V(1.3, 1.6, -0.27), fov: 42 },
+  lab: { pos: V(0.45, 1.44, 0.82), target: V(1.14, 1.3, -0.02), fov: 40 },
 };
 
 // vignettatura e grana leggere, dopo l'OutputPass (spazio sRGB)
 const FinishShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAspect: { value: 1.6 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAspect: { value: 1.6 }, uVig: { value: 0.5 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime; uniform float uAspect; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uAspect; uniform float uVig; varying vec2 vUv;
     float h(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     void main(){
       vec2 d = vUv - 0.5;
       vec4 c = texture2D(tDiffuse, vUv);
       vec2 q = d * vec2(uAspect, 1.0);
-      c.rgb *= mix(0.5, 1.0, smoothstep(1.05, 0.25, length(q)));
+      c.rgb *= mix(uVig, 1.0, smoothstep(1.05, 0.25, length(q)));
       c.rgb += (h(gl_FragCoord.xy + fract(uTime * 7.3) * 431.0) - 0.5) * 0.022;
       gl_FragColor = c;
     }`,
@@ -123,6 +123,33 @@ export async function start({ data, root, force, toLofi }) {
   const finish = new ShaderPass(FinishShader);
   composer.addPass(finish);
 
+  // --- tema: scuro = notte (la luce di sempre), chiaro = giorno ---
+  let day = document.documentElement.dataset.theme === "light" ? 1 : 0;
+  const BG_NIGHT = new THREE.Color(0x050608), BG_DAY = new THREE.Color(0xdfe3e0);
+  function applyDay(k) {
+    const L = THREE.MathUtils.lerp;
+    room.setDay(k);
+    renderer.toneMappingExposure = L(1.45, 1.0, k);
+    bloom.strength = L(0.72, 0.25, k);
+    bloom.threshold = L(1.35, 2.2, k);
+    finish.uniforms.uVig.value = L(0.5, 0.86, k);
+    lamp.spot.intensity = L(1.7, 1.0, k);
+    scene.background.lerpColors(BG_NIGHT, BG_DAY, k);
+  }
+  applyDay(day);
+  // al cambio tema la scena sfuma un attimo, cambia luce e riappare (cosi' non si vede lo scatto)
+  window.addEventListener("lm-theme", (e) => {
+    const k = e.detail === "light" ? 1 : 0;
+    if (k === day) return;
+    day = k;
+    if (reduced) { applyDay(day); return; }
+    root.classList.add("is-switching");
+    setTimeout(() => {
+      applyDay(day);
+      requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("is-switching")));
+    }, 260);
+  });
+
   function resize() {
     const w = holder.clientWidth || window.innerWidth, h = holder.clientHeight || window.innerHeight;
     renderer.setPixelRatio(dpr);
@@ -155,7 +182,7 @@ export async function start({ data, root, force, toLofi }) {
   addHit(extras.printer, "print");
   addHit(objects.sections.about, "about");
   addHit(objects.sections.contact, "contact");
-  addHit(room.poster, "lab");
+  addHit(extras.tv, "lab");
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
@@ -176,16 +203,18 @@ export async function start({ data, root, force, toLofi }) {
   addTag("print", hitOf("print")[0].userData.top, 24);
   const synthTops = hitOf("shop").map((m) => m.userData.top);
   addTag("shop", synthTops.reduce((acc, p) => acc.add(p), V(0, 0, 0)).multiplyScalar(1 / synthTops.length).setY(Math.max(...synthTops.map((p) => p.y))), 44);
-  addTag("lab", hitOf("lab")[0].position.clone().add(V(0, -0.2, 0)), 0); // a meta' poster: non copre il selettore della lingua
+  addTag("lab", hitOf("lab")[0].userData.top, 20);
   addTag("contact", hitOf("contact")[0].userData.top, 22);
   const tagPos = new THREE.Vector3();
+  const TAG_MIN_Y = 132; // px dal bordo alto: barra (circa 80) + altezza dell'etichetta
   function updateTags() {
     const on = state.entered && state.view === "overview" && !rig.moving;
     if (tagLayer.classList.contains("on") !== on) { tagLayer.classList.toggle("on", on); tagLayer.inert = !on; }
     if (!on) return;
     for (const t of tags) {
       tagPos.copy(t.point).project(camera);
-      const x = (tagPos.x + 1) / 2 * size.x, y = (1 - tagPos.y) / 2 * size.y;
+      // le etichette restano sotto la barra di navigazione anche quando la parallasse sposta l'inquadratura
+      const x = (tagPos.x + 1) / 2 * size.x, y = Math.max((1 - tagPos.y) / 2 * size.y, TAG_MIN_Y);
       t.a.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
     }
   }

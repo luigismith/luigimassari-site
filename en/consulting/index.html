@@ -19,7 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=202611181435">
+<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181522">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ProfessionalService", "name": "Luigi Massari — IT and AI consulting", "url": "https://luigimassari.com/en/consulting/", "email": "info@luigimassari.com", "areaServed": ["Taranto", "Puglia", "IT"], "address": {"@type": "PostalAddress", "addressLocality": "Taranto", "addressRegion": "TA", "addressCountry": "IT"}, "founder": {"@type": "Person", "name": "Luigi Massari"}, "hasOfferCatalog": {"@type": "OfferCatalog", "name": "Services", "itemListElement": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": "AI to search company documents and automate repetitive tasks", "description": "Assistants that answer from company data and documents, automatic data extraction from PDFs and emails, automation between the tools already in use. With attention to data confidentiality and GDPR."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Networks, backup and IT security", "description": "Infrastructure review, Microsoft 365 and cloud, networks, backup and disaster recovery, security and NIS2 compliance."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Custom business software for data, deadlines and documents", "description": "Applications with user accounts, roles, databases and reports, replacing spreadsheets, emails and manual procedures."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Company websites, campaign pages and online shops", "description": "Company sites, campaign pages and small online shops: fast, readable on a phone, ready for Google and multilingual."}}]}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is the service only available in Taranto?", "acceptedAnswer": {"@type": "Answer", "text": "No: in-person meetings in Puglia, remote work with clients across Italy and abroad."}}, {"@type": "Question", "name": "Who looks after the site after launch?", "acceptedAnswer": {"@type": "Answer", "text": "You can run it yourself after a short training session, or outsource maintenance."}}]}</script>
@@ -34,13 +35,14 @@
     <nav id="nav" class="tuner" aria-label="Site sections" data-tuner>
       <ul>
         <li><a href="/en/consulting/" data-station="dev" aria-current="page">IT and AI consulting</a></li>
-        <li><a href="/en/#3d-printing" data-station="print">3D printing</a></li>
+        <li><a href="/en/#3d-printing" data-station="print">3D printing and laser</a></li>
         <li><a href="/en/elettrofoni/" data-station="shop">Instruments</a></li>
         <li><a href="/en/#training" data-station="lab">Training</a></li>
         <li><a href="/en/contact/" data-station="contact">Contact</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
+    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Light" data-label-dark="Dark" title="Switch between the dark and the light theme">Light</button>
     <a class="lang" href="/consulenza/" hreflang="it" lang="it">Italiano</a>
   </div>
 </header>
@@ -101,7 +103,7 @@
     <div>
       <h2 class="h2">Recent work</h2>
       <ul class="work-list">
-        <li><h3 class="h3">Staff housing management</h3><p>Web app to assign and manage around sixty company apartments: contracts, e-signatures and deadlines in one system, replacing spreadsheets and emails. Next.js, Fastify, Prisma.</p></li><li><h3 class="h3">AI assistant on ERP data</h3><p>Answers plain-language questions about a company ERP&#39;s data, read-only, without changing the existing system.</p></li><li><h3 class="h3">This website</h3><p>Static bilingual site with no tracking cookies, a Stripe-connected shop and a 3D version built with Three.js.</p></li>
+        <li><h3 class="h3">Business software for contracts and deadlines</h3><p>Web app that brings contracts, e-signatures and deadlines into one system, replacing spreadsheets and emails.</p></li><li><h3 class="h3">AI assistant on business software data</h3><p>Answers plain-language questions about the data of software already in use, read-only, without changing the existing system.</p></li><li><h3 class="h3">This website</h3><p>Static bilingual site with no tracking cookies, a 3D home built with Three.js and a classic version for phones.</p></li>
       </ul>
     </div>
     <aside class="stack">
@@ -138,12 +140,12 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">IT and AI consulting, 3D printing, electronic musical instruments and training, from Taranto, Italy.</p>
+      <p class="muted">IT and AI consulting, 3D printing and laser cutting, electronic musical instruments and training, from Taranto, Italy.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
       
-      <a href="https://github.com/luigismith">GitHub</a>
+      <a href="https://github.com/luigismith" target="_blank" rel="noopener">GitHub<span class="visually-hidden"> (opens in a new tab)</span></a>
       <a href="/en/privacy/">Privacy</a>
       <a href="/en/terms-of-sale/">Terms of sale</a>
     </div>
@@ -153,6 +155,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181435" defer></script>
+<script src="/assets/site.js?v=202611181522" defer></script>
 </body>
 </html>

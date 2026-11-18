@@ -19,7 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=202611181435">
+<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181522">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ProfessionalService", "name": "Luigi Massari — Consulenza IT e AI", "url": "https://luigimassari.com/consulenza/", "email": "info@luigimassari.com", "areaServed": ["Taranto", "Puglia", "IT"], "address": {"@type": "PostalAddress", "addressLocality": "Taranto", "addressRegion": "TA", "addressCountry": "IT"}, "founder": {"@type": "Person", "name": "Luigi Massari"}, "hasOfferCatalog": {"@type": "OfferCatalog", "name": "Servizi", "itemListElement": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": "AI per cercare nei documenti e automatizzare le attività ripetitive", "description": "Assistenti che rispondono sui dati e sui documenti dell'azienda, estrazione automatica di dati da PDF ed email, automazioni tra i programmi già in uso. Con attenzione a riservatezza dei dati e GDPR."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Reti, backup e sicurezza informatica", "description": "Analisi dell'infrastruttura, Microsoft 365 e cloud, reti, backup e disaster recovery, sicurezza e adeguamento alla NIS2."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Gestionali su misura per dati, scadenze e documenti", "description": "Applicazioni con accesso utenti, ruoli, database e report, al posto di fogli Excel, email e procedure fatte a mano."}}, {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Siti aziendali, pagine per campagne e negozi online", "description": "Siti aziendali, pagine per campagne e piccoli e-commerce: veloci, leggibili da telefono, pronti per Google e in più lingue."}}]}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Il servizio è disponibile solo a Taranto?", "acceptedAnswer": {"@type": "Answer", "text": "No: incontri in presenza in Puglia, lavoro da remoto con clienti in tutta Italia."}}, {"@type": "Question", "name": "Chi si occupa del sito dopo la consegna?", "acceptedAnswer": {"@type": "Answer", "text": "Puoi gestirlo internamente dopo una breve formazione, oppure affidare la manutenzione."}}]}</script>
@@ -34,13 +35,14 @@
     <nav id="nav" class="tuner" aria-label="Sezioni del sito" data-tuner>
       <ul>
         <li><a href="/consulenza/" data-station="dev" aria-current="page">Consulenza IT e AI</a></li>
-        <li><a href="/#stampa-3d" data-station="print">Stampa 3D</a></li>
+        <li><a href="/#stampa-3d" data-station="print">Stampa 3D e laser</a></li>
         <li><a href="/elettrofoni/" data-station="shop">Strumenti</a></li>
         <li><a href="/#formazione" data-station="lab">Formazione</a></li>
         <li><a href="/contatti/" data-station="contact">Contatti</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
+    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Chiaro" data-label-dark="Scuro" title="Passa dal tema scuro al tema chiaro e viceversa">Chiaro</button>
     <a class="lang" href="/en/consulting/" hreflang="en" lang="en">English</a>
   </div>
 </header>
@@ -101,7 +103,7 @@
     <div>
       <h2 class="h2">Lavori recenti</h2>
       <ul class="work-list">
-        <li><h3 class="h3">Gestione degli alloggi del personale</h3><p>Web app per assegnare e gestire circa sessanta alloggi aziendali: contratti, firme digitali e scadenze in un unico sistema, al posto di fogli di calcolo ed email. Next.js, Fastify, Prisma.</p></li><li><h3 class="h3">Assistente AI sui dati del gestionale</h3><p>Risponde in linguaggio naturale alle domande sui dati di un ERP aziendale, in sola lettura e senza modificare il sistema esistente.</p></li><li><h3 class="h3">Questo sito</h3><p>Sito statico bilingue, senza cookie di tracciamento, con negozio collegato a Stripe e una versione 3D in Three.js.</p></li>
+        <li><h3 class="h3">Gestionale per contratti e scadenze</h3><p>Web app che riunisce in un unico sistema contratti, firme digitali e scadenze, al posto di fogli di calcolo ed email.</p></li><li><h3 class="h3">Assistente AI sui dati di un gestionale</h3><p>Risponde in linguaggio naturale alle domande sui dati di un gestionale già in uso, in sola lettura e senza modificare il sistema esistente.</p></li><li><h3 class="h3">Questo sito</h3><p>Sito statico bilingue, senza cookie di tracciamento, con una home 3D in Three.js e una versione classica per telefoni.</p></li>
       </ul>
     </div>
     <aside class="stack">
@@ -138,12 +140,12 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">Consulenza IT e AI, stampa 3D, strumenti musicali elettronici e formazione, da Taranto.</p>
+      <p class="muted">Consulenza IT e AI, stampa 3D e laser, strumenti musicali elettronici e formazione, da Taranto.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
       
-      <a href="https://github.com/luigismith">GitHub</a>
+      <a href="https://github.com/luigismith" target="_blank" rel="noopener">GitHub<span class="visually-hidden"> (si apre in una nuova scheda)</span></a>
       <a href="/privacy/">Privacy</a>
       <a href="/condizioni-di-vendita/">Condizioni di vendita</a>
     </div>
@@ -153,6 +155,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181435" defer></script>
+<script src="/assets/site.js?v=202611181522" defer></script>
 </body>
 </html>
