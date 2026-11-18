@@ -63,6 +63,7 @@ export async function start({ data, root, force, toLofi }) {
   // PCFSoftShadowMap e' stato rimosso in Three r18x (ora ricade su PCF con un avviso):
   // PCFShadowMap con shadow.radius da' la stessa ombra morbida.
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false; // le mappe delle ombre si rifanno solo quando serve (vedi refreshShadows)
   holder.appendChild(renderer.domElement);
   setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 
@@ -183,6 +184,7 @@ export async function start({ data, root, force, toLofi }) {
   addHit(objects.sections.about, "about");
   addHit(objects.sections.contact, "contact");
   addHit(extras.board, "lab");
+  addHit(extras.headphones, "sound"); // non e' una sezione: la cuffia accende e spegne il suono
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
@@ -272,7 +274,9 @@ export async function start({ data, root, force, toLofi }) {
   ui.on("pick", (slug) => pick(slug));
   ui.on("back", back);
   ui.on("lofi", () => toLofi());
-  ui.on("sound", (on) => { audio.setEnabled(on); ui.setSound(on); });
+  // il suono si comanda dal pulsante, dalla scelta all'ingresso e dalla cuffia sul banco: lo stato e' uno solo
+  const setSound = (on) => { audio.setEnabled(on); ui.setSound(on); extras.headphones.userData.setOn(on); };
+  ui.on("sound", setSound);
   ui.bindControls();
 
   // --- puntatore: parallasse, hover, clic ---
@@ -296,6 +300,7 @@ export async function start({ data, root, force, toLofi }) {
     const hit = state.hover;
     if (!hit || !state.entered) return;
     const { view, slug } = hit.userData;
+    if (view === "sound") { setSound(!audio.enabled); return; }
     if (slug) {
       ui.selected = slug;
       if (state.view === "shop") pick(slug);
@@ -329,6 +334,7 @@ export async function start({ data, root, force, toLofi }) {
     const x = (tmp.x + 1) / 2 * size.x, y = (1 - tmp.y) / 2 * size.y;
     if (slug && state.view === "shop") ui.showLabel(x, y, products[slug].name, products[slug].status_label);
     else if (view === "about" && state.view === "overview") ui.showLabel(x, y, data.ui.labels.about); // il tablet non ha etichetta fissa
+    else if (view === "sound") ui.showLabel(x, y, audio.enabled ? data.ui.sound_on : data.ui.sound_off, audio.enabled ? data.ui.sound_hint_off : data.ui.sound_hint_on);
     else ui.hideLabel(); // per le sezioni ci sono gia' le etichette fisse
   }
 
@@ -342,7 +348,12 @@ export async function start({ data, root, force, toLofi }) {
   const timer = new THREE.Timer();
   let t = 0, running = false;
   const fps = { frames: 0, acc: 0, value: 0, samples: [] };
+  // Le luci sono ferme e gli oggetti che fanno ombra non si muovono: le ombre si disegnano nei primi fotogrammi
+  // e poi restano. Ridisegnarle a ogni fotogramma raddoppiava e triplicava le chiamate di disegno.
+  let shadowFrames = 4;
+  const refreshShadows = () => { shadowFrames = 4; };
   function frame(time) {
+    if (shadowFrames > 0) { renderer.shadowMap.needsUpdate = true; shadowFrames--; }
     timer.update(time);
     const dt = Math.min(timer.getDelta(), 0.1);
     t += dt;
@@ -401,7 +412,7 @@ export async function start({ data, root, force, toLofi }) {
     get fps() { return fps.value; },
     firstFps,
   };
-  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio };
+  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio, refreshShadows };
   if (firstFps < 30 && !force) {
     run(false);
     toLofi({ auto: true, message: data.ui.too_slow });

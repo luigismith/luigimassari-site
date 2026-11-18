@@ -24,8 +24,17 @@ export function shadow(o, cast = true, receive = true) {
   o.traverse((c) => { if (c.isMesh) { c.castShadow = cast; c.receiveShadow = receive; } });
   return o;
 }
-// Unisce le mesh statiche che condividono lo stesso materiale (meno chiamate di disegno).
-// Restano separati: InstancedMesh, Points e tutto cio' che sta sotto un nodo con userData.dynamic.
+// Unisce le mesh statiche in poche mesh (meno chiamate di disegno: ognuna si paga tre volte, colore e due ombre).
+// - Stesso materiale: una mesh sola.
+// - Materiali diversi ma "semplici" (solo colore, ruvidezza e metallo): una mesh sola per aspetto, con il colore
+//   scritto sui vertici. Ruvidezza e metallo si arrotondano a passi che a occhio non si distinguono.
+// Restano separati: InstancedMesh, Points, materiali multipli e tutto cio' che sta sotto un nodo con userData.dynamic.
+const lookMats = new Map();
+const lookR = (r) => (r < 0.36 ? 0.3 : r < 0.66 ? 0.5 : 0.85);   // lucido, satinato, opaco
+const lookM = (m) => (m < 0.3 ? 0.05 : m < 0.8 ? 0.55 : 1);       // plastica, verniciato metallizzato, metallo
+const plain = (m) => m.isMeshStandardMaterial && !m.isMeshPhysicalMaterial && !m.map && !m.normalMap && !m.roughnessMap && !m.metalnessMap
+  && !m.emissiveMap && !m.alphaMap && !m.transparent && m.opacity === 1 && m.emissive.getHex() === 0 && m.side === THREE.FrontSide
+  && !m.vertexColors && !m.flatShading;
 export function mergeStatic(root) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
@@ -33,17 +42,24 @@ export function mergeStatic(root) {
   root.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) return;
     for (let p = o; p && p !== root; p = p.parent) if (p.userData.dynamic) return;
-    const key = o.material.uuid + (o.castShadow ? "c" : "") + (o.receiveShadow ? "r" : "");
+    const m = o.material, flags = (o.castShadow ? "c" : "") + (o.receiveShadow ? "r" : "");
+    const key = plain(m) ? "look|" + lookR(m.roughness) + "|" + lookM(m.metalness) + flags : m.uuid + flags;
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(o);
   });
   const m4 = new THREE.Matrix4();
-  for (const list of buckets.values()) {
+  for (const [key, list] of buckets) {
     if (list.length < 2) continue;
+    const byLook = key.startsWith("look|");
     const geos = list.map((m) => {
       let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
       for (const name of Object.keys(g.attributes)) if (!["position", "normal", "uv"].includes(name)) g.deleteAttribute(name);
       if (!g.attributes.uv) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      if (byLook) { // il colore del materiale passa sui vertici
+        const n = g.attributes.position.count, col = new Float32Array(n * 3), c = m.material.color;
+        for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+        g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      }
       g.morphAttributes = {};
       g.clearGroups();
       g.applyMatrix4(m4.multiplyMatrices(inv, m.matrixWorld));
@@ -51,7 +67,13 @@ export function mergeStatic(root) {
     });
     const merged = mergeGeometries(geos, false);
     if (!merged) continue;
-    const mesh = new THREE.Mesh(merged, list[0].material);
+    let material = list[0].material;
+    if (byLook) {
+      const lk = key.split("|").slice(0, 3).join("|");
+      if (!lookMats.has(lk)) lookMats.set(lk, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: lookR(material.roughness), metalness: lookM(material.metalness) }));
+      material = lookMats.get(lk);
+    }
+    const mesh = new THREE.Mesh(merged, material);
     mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
     root.add(mesh);
     for (const m of list) m.removeFromParent();
@@ -429,47 +451,69 @@ void main() {
 }`;
 
 function createSolderingStation(M) {
+  // Saldatore nel suo supporto: base pesante con la spugna e la paglietta d'ottone, molla conica,
+  // saldatore a stilo con flangia, impugnatura e cavo. L'asse della molla sta nel piano x-y.
   const g = new THREE.Group();
   g.name = "soldering";
-  const base = box(0.1, 0.014, 0.075, M.black, 0.004);
-  base.position.y = 0.007;
-  g.add(base);
-  const sponge = box(0.04, 0.008, 0.03, new THREE.MeshStandardMaterial({ color: 0xb98a3c, roughness: 1 }), 0.002);
-  sponge.position.set(-0.025, 0.018, 0.012);
-  g.add(sponge);
-  const wool = new THREE.Mesh(new THREE.TorusKnotGeometry(0.009, 0.0035, 48, 6, 3, 5), M.brass);
-  wool.position.set(0.03, 0.02, 0.015);
-  g.add(wool);
-  const holderA = V(0.0, 0.016, -0.02), holderB = V(0.07, 0.07, -0.02);
-  g.add(rod(V(0.0, 0.014, -0.02), V(0.015, 0.04, -0.02), 0.0025, M.steel));
-  const dir = new THREE.Vector3().subVectors(holderB, holderA);
-  const len = dir.length(); dir.normalize();
+  const dark = new THREE.MeshStandardMaterial({ color: 0x16181b, roughness: 0.45, metalness: 0.4 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.8 });
+  const base = box(0.118, 0.012, 0.078, dark, 0.005, 3);
+  base.position.y = 0.006;
+  const tray = box(0.052, 0.003, 0.037, M.black, 0.0025, 2);
+  tray.position.set(-0.026, 0.0128, 0.016);
+  const sponge = box(0.046, 0.007, 0.031, new THREE.MeshStandardMaterial({ color: 0xc9a23f, roughness: 1 }), 0.003, 2);
+  sponge.position.set(-0.026, 0.0165, 0.016);
+  g.add(base, tray, sponge);
+  // paglietta d'ottone nel suo barattolo
+  const potProf = [[0, 0], [0.017, 0], [0.0195, 0.02], [0.0168, 0.02], [0.0158, 0.004], [0, 0.004]].map(([r, h]) => new THREE.Vector2(r, h));
+  const pot = new THREE.Mesh(new THREE.LatheGeometry(potProf, 32), dark);
+  pot.position.set(0.036, 0.012, 0.018);
+  g.add(pot);
+  [[2, 5, 0, 0.0215], [3, 4, 1.1, 0.0245], [2, 7, 2.3, 0.0275]].forEach(([pp, qq, rz, y]) => {
+    const curl = new THREE.Mesh(new THREE.TorusKnotGeometry(0.0078, 0.002, 90, 5, pp, qq), M.brass);
+    curl.rotation.set(Math.PI / 2, 0, rz);
+    curl.scale.z = 0.55;
+    curl.position.set(0.036, y, 0.018);
+    g.add(curl);
+  });
+  // molla conica e i due sostegni
+  const A = V(-0.03, 0.03, -0.02), B = V(0.045, 0.082, -0.02);
+  const dir = new THREE.Vector3().subVectors(B, A);
+  const len = dir.length();
+  dir.normalize();
   const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), dir);
-  const off = V(0.012, 0.022, 0);
-  const pts = [];
-  for (let i = 0; i <= 120; i++) {
-    const t = i / 120, a = t * 14 * Math.PI, r = 0.007 + t * 0.006;
-    pts.push(V(Math.cos(a) * r, t * len, Math.sin(a) * r).applyQuaternion(q).add(holderA).add(off));
+  const TURNS = 19, pts = [];
+  for (let i = 0; i <= 380; i++) {
+    const t = i / 380, a = t * TURNS * Math.PI * 2, r = 0.0052 + t * 0.0058;
+    pts.push(V(Math.cos(a) * r, t * len, Math.sin(a) * r).applyQuaternion(q).add(A));
   }
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, 0.0011, 5), M.steel));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 760, 0.00075, 5), M.steel));
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.0112, 0.0012, 8, 28), M.steel);
+  mouth.quaternion.setFromUnitVectors(V(0, 0, 1), dir);
+  mouth.position.copy(B);
+  g.add(mouth, rod(V(-0.03, 0.012, -0.02), V(-0.0285, 0.0256, -0.02), 0.0024, M.steel), rod(V(0.05, 0.012, -0.02), V(0.0514, 0.0728, -0.02), 0.0024, M.steel));
+  // saldatore: y e' il suo asse, la punta verso -y
   const iron = new THREE.Group();
-  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0075, 0.08, 20), new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.7 }));
-  grip.position.y = 0.06;
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0085, 0.012, 20), new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.5 }));
-  collar.position.y = 0.014;
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.06, 14), M.steel);
-  shaft.position.y = -0.02;
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0028, 0.016, 12), new THREE.MeshStandardMaterial({ color: 0x6b5a48, roughness: 0.4, metalness: 0.9 }));
-  tip.rotation.z = Math.PI; tip.position.y = -0.058;
-  iron.add(grip, collar, shaft, tip);
-  iron.position.copy(holderA).add(holderB).multiplyScalar(0.5).add(off);
+  const part = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; iron.add(m); return m; };
+  part(new THREE.ConeGeometry(0.0022, 0.016, 14), new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.35, metalness: 0.9 }), -0.066).rotation.z = Math.PI;
+  part(new THREE.CylinderGeometry(0.0032, 0.0028, 0.05, 14), M.steel, -0.033);
+  part(new THREE.CylinderGeometry(0.0056, 0.0056, 0.004, 20), M.steel, -0.006);
+  part(new THREE.CylinderGeometry(0.0092, 0.0058, 0.02, 24), rubber, 0.006);
+  part(new THREE.CylinderGeometry(0.0086, 0.0092, 0.07, 24), rubber, 0.051);
+  part(new THREE.CylinderGeometry(0.0068, 0.0086, 0.012, 24), rubber, 0.092);
+  part(new THREE.CylinderGeometry(0.0028, 0.0052, 0.02, 14), M.black, 0.108);
+  part(new THREE.TorusGeometry(0.0093, 0.0011, 8, 28), new THREE.MeshStandardMaterial({ color: 0xffb44a, roughness: 0.4, metalness: 0.5 }), 0.0165).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 5; k++) part(new THREE.TorusGeometry(0.0092, 0.0008, 6, 24), M.black, 0.026 + k * 0.0056).rotation.x = Math.PI / 2;
+  iron.position.copy(B).addScaledVector(dir, -0.004);
   iron.quaternion.copy(q);
   g.add(iron);
-  const tipPos = V(0, -0.066, 0).applyQuaternion(q).add(iron.position);
+  const tipPos = V(0, -0.074, 0).applyQuaternion(q).add(iron.position);
+  const end = V(0, 0.118, 0).applyQuaternion(q).add(iron.position);
   const cable = new THREE.CatmullRomCurve3([
-    V(0, 0.1, 0).applyQuaternion(q).add(iron.position), V(0.11, 0.09, -0.03), V(0.16, 0.003, -0.08), V(0.25, 0.003, -0.05),
+    end, end.clone().addScaledVector(dir, 0.016).add(V(0.004, -0.008, 0)), V(0.176, 0.108, -0.022), V(0.186, 0.05, -0.026),
+    V(0.1765, 0.006, -0.0314), V(0.107, 0.0035, -0.0887), V(0.057, 0.0035, -0.142),
   ]);
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(cable, 40, 0.0022, 6), M.black));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(cable, 60, 0.0021, 6), M.black));
   // fumo: particelle leggere che salgono dalla punta
   const N = 48;
   const geo = new THREE.BufferGeometry();
@@ -580,7 +624,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   sections.contact = recorder.group;
 
   const station = createSolderingStation(M);
-  place(station.group, 0.12, 0.32, 0.15);
+  place(station.group, -0.37, 0.305, 0.35); // sul tappetino da taglio, dove non copre il tablet
   updaters.push(station.update);
   place(createMug().group, 0.14, -0.08, 2.4);
 
