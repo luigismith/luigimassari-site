@@ -26,7 +26,9 @@ uniform float uTime;
 uniform vec2 uSize;
 uniform float uRain;
 uniform float uDay;   // 0 = notte (tema scuro), 1 = giorno (tema chiaro); in mezzo il crepuscolo (solo "dal vivo")
-uniform float uCloud; // nuvolosita': 0 sereno, 1 coperto. Tema scuro 0.66, tema chiaro 1 (i cieli di sempre)
+uniform float uCloud; // nuvolosita': 0 sereno, 1 coperto. Tema scuro 0.66, tema chiaro 0.22 (bella giornata)
+uniform float uHaze;  // foschia di giorno: 0 aria tersa, 1 lontananze velate
+uniform float uSunGlow; // alone del sole in alto a sinistra (solo tema chiaro: nel 'dal vivo' la posizione vera del sole non e' disegnata)
 uniform float uDusk;  // 0..1: quanto l'orizzonte si scalda all'alba e al tramonto (0 nei temi scuro e chiaro)
 uniform float uAlpha; // opacita': 1, tranne che per il panorama di giorno sovrapposto a quello di notte al crepuscolo
 uniform sampler2D uStars; // cielo vero ("dal vivo"): le stelle disegnate da setHeavens
@@ -371,7 +373,7 @@ vec3 daySky(float az, float el, float t) {
   col = mix(col, vec3(0.72, 0.74, 0.76), smoothstep(0.42, 0.78, c) * 0.7);
   if (uCloud < 0.995) {
     // sereno: azzurro, piu' chiaro verso l'orizzonte, con le nubi bianche che il meteo dichiara
-    vec3 blue = mix(vec3(0.40, 0.60, 0.86), vec3(0.06, 0.22, 0.58), smoothstep(0.0, 0.45, h));   // valori saturi: la resa finale li schiarisce
+    vec3 blue = mix(vec3(0.22, 0.45, 0.82), vec3(0.015, 0.10, 0.42), smoothstep(0.0, 0.3, h));   // valori saturi: la resa finale li schiarisce
     float lo = mix(0.80, 0.34, uCloud);
     blue = mix(blue, vec3(0.96, 0.97, 0.98), smoothstep(lo, lo + 0.22, c) * 0.9);
     col = mix(blue, col, smoothstep(0.55, 1.0, uCloud));
@@ -381,10 +383,11 @@ vec3 daySky(float az, float el, float t) {
 vec3 townDay(float u, float y) {
   // case chiare con le file di finestre
   float win = step(0.55, fract(u * 18.0)) * step(0.5, fract(y / 0.0042)) * step(0.006, y);
-  vec3 c = mix(vec3(0.62, 0.61, 0.58), vec3(0.36, 0.38, 0.40), win * 0.7) * (0.9 + 0.1 * h11(floor(u * 6.0)));
+  vec3 stone = mix(vec3(0.80, 0.72, 0.58), vec3(0.62, 0.61, 0.58), smoothstep(0.3, 0.9, uCloud));   // al sole la pietra si scalda
+  vec3 c = mix(stone, vec3(0.30, 0.33, 0.36), win * 0.7) * (0.9 + 0.1 * h11(floor(u * 6.0)));
   if (inCastle(u)) {
     float shade = mix(0.74, 0.55 + 0.45 * towerShade(u, y), towers(u));
-    c = vec3(0.56, 0.50, 0.41) * shade * (0.92 + 0.08 * vnoise(vec2(u * 60.0, y * 1400.0)));
+    c = mix(vec3(0.72, 0.60, 0.44), vec3(0.56, 0.50, 0.41), smoothstep(0.3, 0.9, uCloud)) * shade * (0.92 + 0.08 * vnoise(vec2(u * 60.0, y * 1400.0)));
   }
   return c;
 }
@@ -396,7 +399,8 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float dep = max(HOR - el, 0.0004);
     vec2 wp = vec2(az / dep, 1.0 / dep);
     float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
-    col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
+    vec3 sea = mix(vec3(0.30, 0.38, 0.44), vec3(0.12, 0.30, 0.42), (1.0 - uCloud) * 0.8);            // col sereno il mare e' blu
+    col = mix(sea, sea * 0.5, smoothstep(0.0, 0.3, dep)) + rip * 0.07;
     col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud));   // con il sereno l'acqua prende l'azzurro del cielo
     float u = townU(az) + rip * 0.25;                            // riflesso scuro del ponte e chiaro del castello
     if (abs(u) < 1.0) col *= 1.0 - 0.28 * smoothstep(bridgeUnder(u) - 0.004, bridgeUnder(u), dep) * (1.0 - smoothstep(DECK, DECK + 0.006, dep));
@@ -413,8 +417,8 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float ce = skyline(az);
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
-    vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR)) * (1.0 + 0.22 * (1.0 - uCloud));
-    if (abs(u) < 3.1) hill = mix(hill, mix(townDay(u, y), daySky(az, HOR + 0.02, t), 0.42), townK(u));   // velati dalla distanza
+    vec3 hill = mix(mix(vec3(0.20, 0.26, 0.29), vec3(0.20, 0.27, 0.20), 1.0 - uCloud), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR)) * (1.0 + 0.22 * (1.0 - uCloud));
+    if (abs(u) < 3.1) hill = mix(hill, mix(townDay(u, y), daySky(az, HOR + 0.02, t), mix(0.2, 0.42, uCloud)), townK(u));   // velati dalla distanza
     col = mix(daySky(az, el, t), hill, land);
     if (abs(u) < 1.4) {                                          // ponte girevole: acciaio grigio azzurro, parapetto e lampioni
       float be = 0.0005 + blur * 0.0010;
@@ -440,6 +444,13 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
       }
     }
   }
+  // foschia leggera: un velo chiaro e caldo, fitto sull'orizzonte e sull'acqua lontana, che sale piano nel cielo
+  float hz = uHaze * (0.5 * exp(-abs(el - HOR) / 0.018) + 0.08 * exp(-max(el - HOR, 0.0) / 0.15));
+  vec3 hazeCol = vec3(0.84, 0.86, 0.86) + vec3(0.08, 0.05, 0.0) * uSunGlow;
+  col = mix(col, hazeCol, clamp(hz, 0.0, 0.75));
+  // il sole, fuori dalla vetrata in alto a sinistra: solo il suo alone nella foschia
+  vec2 sd = vec2((az + 0.85) * 0.8, el - 0.42);
+  col += vec3(1.0, 0.92, 0.75) * uSunGlow * (0.22 * exp(-dot(sd, sd) / 0.05) + 0.06 * exp(-dot(sd, sd) / 0.4)) * (1.0 - uCloud);
   return col;
 }
 
@@ -539,7 +550,7 @@ export function createGlass() {
   // uso bloccava la pagina per 7-8 secondi (compilazione), e prepararla prima con compileAsync non serviva.
   // cielo vero ("dal vivo"): le stelle si disegnano su questa tela (room.setHeavens) e lo shader le legge come texture
   const skyCanvas = canvas(1536, 768), skyTex = tex(skyCanvas, { mips: false });
-  const shared = { uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 } };
+  const shared = { uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 }, uHaze: { value: 0 }, uSunGlow: { value: 0 } };
   const material = (MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms: { ...shared, uAlpha: { value: 1 } }, defines: { MODE }, transparent: true });
   const variants = [0, 1].map(material);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), variants[0]);
@@ -624,56 +635,115 @@ export function createRoom(ctx) {
   bar(ft, H, 0.05, win.x1 - ft / 2, cy, fz);
   for (const k of [1, 2]) bar(0.022, H - ft * 2, 0.045, win.x0 + (W * k) / 3, cy, fz);
   // --- proiezione sul vetro: nella modalita' "dal vivo" il meteo si legge qui, come proiettato sulla vetrata ---
-  // Sta nel riquadro di sinistra, sopra l'orizzonte. Di notte e' luce che si somma al panorama; di giorno,
-  // quando una luce proiettata non si vedrebbe, diventa una scritta scura.
-  const PJ = { w: 0.54, h: 0.156, cw: 1024, ch: 296 };
-  const pjCanvas = canvas(PJ.cw, PJ.ch), pjCtx = pjCanvas.getContext("2d"), pjMap = tex(pjCanvas);
-  const pjMat = new THREE.MeshBasicMaterial({ map: pjMap, transparent: true, depthWrite: false, color: new THREE.Color(1.45, 1.45, 1.45) });
+  // Stessa luce dell'ologramma dello spettro sopra i synth: ambra che si somma al panorama, righe di scansione,
+  // bordi che sfumano e una curva luminosa, che qui e' la temperatura delle prossime ore con la pioggia in barre.
+  // Sta nel riquadro di destra, sotto il ponte e sopra l'ologramma dello spettro. Di giorno una luce proiettata non si vedrebbe:
+  // allora diventa una scritta scura sul vetro.
+  const PJ = { w: 0.72, h: 0.315, cw: 1024, ch: 448 };
+  const pjCanvas = canvas(PJ.cw, PJ.ch), pjCtx = pjCanvas.getContext("2d"), pjMap = tex(pjCanvas, { mips: false });
+  const pjMat = new THREE.ShaderMaterial({
+    uniforms: { uMap: { value: pjMap }, uTime: { value: 0 }, uGain: { value: 1.7 }, uNight: { value: 1 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
+    fragmentShader: /* glsl */ `
+uniform sampler2D uMap; uniform float uTime, uGain, uNight; varying vec2 vUv;
+void main() {
+  vec4 c = texture2D(uMap, vUv);
+  float edge = smoothstep(0.0, 0.025, vUv.x) * smoothstep(1.0, 0.975, vUv.x);
+  float scan = 0.8 + 0.2 * sin(vUv.y * 470.0 + uTime * 5.0);                         // righe che scorrono, come l'ologramma
+  float flick = 0.97 + 0.03 * sin(uTime * 23.0) * sin(uTime * 3.7);
+  float pass = fract(uTime * 0.065) * 1.3 - 0.15;                                     // un'onda di luce percorre la curva
+  float sweep = 1.0 + 0.7 * exp(-pow((vUv.x - pass) / 0.045, 2.0)) * step(vUv.y, 0.47);
+  float k = mix(0.85 + 0.15 * scan, scan * flick * sweep, uNight);
+  gl_FragColor = vec4(c.rgb * mix(1.0, uGain, uNight) * k, c.a * edge);
+}`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
   const projection = new THREE.Mesh(new THREE.PlaneGeometry(PJ.w, PJ.h), pjMat);
   projection.name = "projection";
-  projection.position.set(0.675, 1.615, ROOM.glassZ + 0.012);   // riquadro di destra, nel cielo sopra il ponte girevole
+  projection.userData.canvas = pjCanvas;
+  projection.position.set(0.68, 1.262, ROOM.glassZ + 0.012);
   projection.renderOrder = 3;
   projection.visible = false;
   group.add(projection);
   let pjLines = null, pjNight = true;
   function drawProjection() {
-    const x = pjCtx;
-    x.clearRect(0, 0, PJ.cw, PJ.ch);
+    const x = pjCtx, W = PJ.cw;
+    x.clearRect(0, 0, W, PJ.ch);
     if (pjLines) {
-      // velo sfumato dietro le scritte: di notte scuro (le luci non le confondono), di giorno chiaro
-      for (let i = 0; i < 10; i++) {
-        x.fillStyle = pjNight ? "rgba(5, 11, 18, 0.036)" : "rgba(238, 240, 234, 0.045)";
-        x.fillRect(i * 9, i * 5, PJ.cw - i * 18, PJ.ch - i * 10);
-      }
-      const ink = pjNight ? "#FFF1DA" : "#14202B", accent = pjNight ? "#FFB44A" : "#8A4A00", soft = pjNight ? "rgba(255, 241, 218, 0.82)" : "rgba(20, 32, 43, 0.82)";
+      const N = pjNight;
+      const amber = N ? "#FFB44A" : "#7A3E00", ink = N ? "#FFE9C8" : "#16222D", soft = N ? "rgba(255, 226, 186, 0.86)" : "rgba(22, 34, 45, 0.86)";
+      const glow = (c, b) => { x.shadowColor = N ? c : "rgba(255, 255, 255, 0.75)"; x.shadowBlur = N ? b : 4; };
       const fit = (text, size, weight, max) => { let s = size + 4; do { s -= 4; x.font = `${weight} ${s}px ${FONT}`; } while (x.measureText(text).width > max && s > 26); };
       x.textBaseline = "alphabetic";
-      x.shadowColor = pjNight ? "rgba(255, 180, 74, 0.5)" : "rgba(255, 255, 255, 0.7)";   // alone della luce proiettata
-      x.shadowBlur = pjNight ? 16 : 5;
-      // a sinistra la temperatura, grande; a destra che tempo fa, l'ora con il posto e la fonte dei dati
-      let left = 56;
+      // in alto: la temperatura grande a sinistra; a destra che tempo fa, il posto con l'ora e la fonte dei dati
+      let left = 44;
       if (pjLines.big) {
-        fit(pjLines.big, 176, 800, 400);
-        x.fillStyle = accent;
-        x.fillText(pjLines.big, left, 206);
-        left += x.measureText(pjLines.big).width + 44;
+        fit(pjLines.big, 196, 800, 440);
+        glow("rgba(255, 160, 60, 0.85)", 22);
+        x.fillStyle = amber;
+        x.fillText(pjLines.big, left, 186);
+        left += x.measureText(pjLines.big).width + 40;
       }
-      const max = PJ.cw - left - 48;
-      fit(pjLines.main, 70, 700, max);
+      const max = W - left - 40;
+      fit(pjLines.main, 84, 700, max);
+      glow("rgba(255, 200, 130, 0.7)", 14);
       x.fillStyle = ink;
-      x.fillText(pjLines.main, left, 104);
-      x.shadowBlur = pjNight ? 7 : 0;
-      x.font = `500 38px ${FONT}`;
+      x.fillText(pjLines.main, left, 88);
+      fit(pjLines.sub, 54, 600, max);
       x.fillStyle = soft;
-      const rows = [];
-      let line = "";
-      for (const word of pjLines.sub.split(" ")) {   // la riga dell'ora va a capo sulle parole
-        const probe = line ? line + " " + word : word;
-        if (line && x.measureText(probe).width > max) { rows.push(line); line = word; } else line = probe;
+      x.fillText(pjLines.sub, left, 148);
+      if (pjLines.credit) {
+        x.font = `500 34px ${FONT}`;
+        x.fillStyle = N ? "rgba(255, 226, 186, 0.62)" : "rgba(22, 34, 45, 0.7)";
+        x.fillText(pjLines.credit, left, 192);
       }
-      rows.push(line);
-      if (pjLines.credit) rows.push(pjLines.credit);
-      rows.slice(0, 3).forEach((row, i) => x.fillText(row, left, 154 + i * 46));
+      const hrs = pjLines.hours;
+      if (hrs) {
+        // in basso la curva: temperatura ora per ora (linea) e pioggia (barre a tacche, come lo spettro)
+        const X0 = 100, X1 = W - 100, top = 276, bottom = 346, floor = 396;
+        const px = (i) => X0 + ((X1 - X0) * i) / (hrs.length - 1);
+        let lo = Math.min(...hrs.map((h) => h.temp)), hi = Math.max(...hrs.map((h) => h.temp));
+        if (hi - lo < 4) { const m = (hi + lo) / 2; lo = m - 2; hi = m + 2; }
+        const py = (t) => bottom - ((t - lo) / (hi - lo)) * (bottom - top);
+        x.shadowBlur = 0;
+        hrs.forEach((h, i) => {
+          const bw = 18, bx = px(i) - bw / 2, mm = Math.min(4, h.mm), tall = mm > 0 ? 10 + 46 * Math.sqrt(mm / 4) : 4;
+          for (let y = floor; y > floor - tall; y -= 8) {
+            x.fillStyle = mm > 0 ? (y < floor - 30 ? "rgba(255, 92, 60, 0.9)" : N ? "rgba(255, 170, 80, 0.85)" : "rgba(122, 62, 0, 0.8)") : N ? "rgba(255, 190, 120, 0.32)" : "rgba(22, 34, 45, 0.3)";
+            x.fillRect(bx, y - 5, bw, Math.min(5, y - (floor - tall)));
+          }
+        });
+        // la linea: morbida, con un'anima chiara e l'alone ambra
+        const path = () => {
+          x.beginPath();
+          x.moveTo(px(0), py(hrs[0].temp));
+          for (let i = 1; i < hrs.length; i++) {
+            const mx = (px(i - 1) + px(i)) / 2;
+            x.bezierCurveTo(mx, py(hrs[i - 1].temp), mx, py(hrs[i].temp), px(i), py(hrs[i].temp));
+          }
+        };
+        x.lineCap = x.lineJoin = "round";
+        glow("rgba(255, 160, 60, 0.95)", 20);
+        x.strokeStyle = amber; x.lineWidth = 7; path(); x.stroke();
+        if (N) { x.shadowBlur = 0; x.strokeStyle = "#FFF0D8"; x.lineWidth = 2.5; path(); x.stroke(); }
+        // ogni tre ore: il punto, i gradi sopra e l'ora sotto
+        x.textAlign = "center";
+        for (let i = 0; i < hrs.length; i += 3) {
+          const cx = px(i), cy = py(hrs[i].temp);
+          glow("rgba(255, 160, 60, 0.9)", 12);
+          x.fillStyle = N ? "#FFF0D8" : amber;
+          x.beginPath(); x.arc(cx, cy, 7, 0, Math.PI * 2); x.fill();
+          x.font = `700 40px ${FONT}`;
+          x.fillStyle = ink;
+          x.fillText(Math.round(hrs[i].temp) + "°", cx, cy - 18);
+          x.shadowBlur = 0;
+          x.font = `600 38px ${FONT}`;
+          x.fillStyle = soft;
+          x.fillText(hrs[i].label, cx, 442);
+        }
+        x.textAlign = "left";
+      }
+      x.shadowBlur = 0;
     }
     pjMap.needsUpdate = true;
   }
@@ -705,7 +775,7 @@ export function createRoom(ctx) {
     glass,
     // day: 0 = notte, 1 = giorno (di giorno entra luce chiara dalla vetrata e le pareti schiariscono).
     // rain: 0 vetro asciutto .. 1 pioggia. cloud: 0 sereno .. 1 coperto. warm: 0..1, alba e tramonto.
-    // Tema scuro = { day 0, rain 1, cloud 0.66 }, tema chiaro = { day 1, rain 1, cloud 1 }: sono i due aspetti di sempre.
+    // Tema scuro = { day 0, rain 1, cloud 0.66 }, tema chiaro = { day 1, rain 0, cloud 0.22, haze 0.35, sun 1 }: notte di pioggia e bella giornata.
     // cielo vero: stelle e Luna calcolate da sky.js (solo "dal vivo", al buio); null lo spegne
     setHeavens(h) {
       const S = glass.userData.sky, u = S.uniforms;
@@ -731,16 +801,18 @@ export function createRoom(ctx) {
       const m = h.moon;
       if (m.el > -0.008 && Math.abs(m.az) < PATCH.az) { u.uMoon.value.set(m.az, m.el, m.lit, 1); u.uMoonDir.value.set(m.dir[0], m.dir[1]); }
     },
-    // testo proiettato sul vetro: { big, main, sub, credit }; null lo spegne
+    // testo proiettato sul vetro: { big, main, sub, credit, hours: [{ temp, mm, label }] | null }; null lo spegne
     setProjection(lines) {
       pjLines = lines;
       projection.visible = !!lines;
       drawProjection();
     },
-    setSky({ day: k, rain = 1, cloud = 1, warm = 0 }) {
+    setSky({ day: k, rain = 1, cloud = 1, warm = 0, haze = 0.25, sun = 0 }) {
       if ((k < 0.5) !== pjNight) {   // la proiezione cambia veste tra notte e giorno
         pjNight = k < 0.5;
-        pjMat.color.setScalar(pjNight ? 1.45 : 1);
+        pjMat.uniforms.uNight.value = pjNight ? 1 : 0;
+        pjMat.blending = pjNight ? THREE.AdditiveBlending : THREE.NormalBlending;   // di notte luce che si somma, di giorno inchiostro
+        pjMat.needsUpdate = true;
         drawProjection();
       }
       const L = THREE.MathUtils.lerp, open = (1 - cloud) * k;   // quanto cielo sereno si vede, di giorno
@@ -751,6 +823,7 @@ export function createRoom(ctx) {
       over.material.uniforms.uAlpha.value = k;
       const u = glass.material.uniforms;
       u.uDay.value = k; u.uRain.value = rain; u.uCloud.value = cloud; u.uDusk.value = twilight ? warm : 0;
+      u.uHaze.value = haze; u.uSunGlow.value = sun;
       moon.color.lerpColors(NIGHT.moon, DAY.moon, k).lerp(DUSK, warm * 0.6);
       moon.intensity = L(0.6, 1.4, k) * (1 + 0.6 * open);
       fill.color.lerpColors(NIGHT.sky, DAY.sky, k);
@@ -763,6 +836,7 @@ export function createRoom(ctx) {
     },
     update(t) {
       glass.material.uniforms.uTime.value = t;
+      pjMat.uniforms.uTime.value = t;
     },
   };
 }

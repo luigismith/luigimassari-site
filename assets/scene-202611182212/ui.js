@@ -99,7 +99,8 @@ export class UI {
   setWeather(s) {
     if (!s) { this.weatherBox.hidden = true; return { text: "", lines: null }; }
     const u = this.data.ui, here = s.where === "you", ok = s.weather === "ok";
-    const time = s.date.toLocaleTimeString(document.documentElement.lang || "it", { hour: "2-digit", minute: "2-digit", ...(here ? {} : { timeZone: "Europe/Rome" }) });
+    const lang = document.documentElement.lang || "it", zone = here ? {} : { timeZone: "Europe/Rome" };
+    const time = s.date.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", ...zone });
     const kind = ok ? u.live_kinds[s.kind] : s.weather === "wait" ? u.live_wait : u.live_none;
     const temp = ok && s.temp !== null ? s.temp + " °C" : "";
     const main = kind + (temp ? ", " + temp : "");
@@ -109,7 +110,12 @@ export class UI {
     this.weatherCredit.hidden = s.weather === "none";
     this.weatherBox.hidden = false;
     // text: per l'annuncio ai lettori di schermo; lines: quello che la scena proietta sul vetro
-    return { text: main + ". " + sub, lines: { big: temp, main: kind, sub, credit: s.weather === "none" ? "" : u.live_credit } };
+    // le prossime ore, per la curva: ora locale del posto, temperatura e pioggia
+    const hours = ok && s.hours && s.hours.length >= 4
+      ? s.hours.map((x) => ({ temp: x.temp, mm: x.mm, label: new Date(x.time).toLocaleTimeString(lang, { hour: "2-digit", hourCycle: "h23", ...zone }).replace(/\D/g, "") }))
+      : null;
+    const place = (here ? u.live_at_you : u.live_at_taranto).replace("{time}", time) + (s.weather === "none" ? ". " + u.live_light : "");
+    return { text: main + ". " + sub, lines: { big: temp, main: kind, sub: place, credit: s.weather === "none" ? "" : u.live_credit, hours } };
   }
 
   setSound(on) {

@@ -9,7 +9,7 @@
 
 export const TARANTO = { lat: 40.5, lon: 17.2 };
 const MET = "https://api.met.no/weatherapi/locationforecast/2.0/compact";
-const HALF_HOUR = 30 * 60 * 1000;
+const HOUR = 60 * 60 * 1000, HALF_HOUR = HOUR / 2;
 const RAD = Math.PI / 180;
 const norm = (deg) => ((deg % 360) + 360) % 360;
 
@@ -67,14 +67,27 @@ export function readWeather(json, date = new Date()) {
   if (kind === "fog") cloud = 1;
   if (rain >= 0.8) cloud = Math.max(cloud, 0.7);
   const temp = typeof now.air_temperature === "number" ? Math.round(now.air_temperature) : null;
-  return { rain, cloud: Math.min(1, Math.max(0, cloud)), kind, temp };
+  // le prossime ore, una per una: temperatura e pioggia, per la curva proiettata sul vetro.
+  // Ci si ferma al primo buco: piu' avanti la serie passa a passi di sei ore.
+  const hours = [];
+  let prev = 0;
+  for (const s of series) {
+    const t = new Date(s.time).getTime(), d = s.data || {};
+    if (t < date.getTime() - HOUR / 2) continue;
+    const it = d.instant && d.instant.details, n1 = d.next_1_hours;
+    if (!it || typeof it.air_temperature !== "number" || !n1 || (prev && t - prev > HOUR * 1.5)) break;
+    hours.push({ time: t, temp: it.air_temperature, mm: (n1.details && n1.details.precipitation_amount) || 0 });
+    prev = t;
+    if (hours.length === 13) break;
+  }
+  return { rain, cloud: Math.min(1, Math.max(0, cloud)), kind, temp, hours };
 }
 
 const forecasts = new Map(); // ultima risposta per ogni posto, con la sua scadenza: in memoria, mai su disco
 
 export class LiveMode {
   // onChange riceve lo stato a ogni aggiornamento:
-  // { day, alt, warm, rain, cloud, kind, temp, weather: "wait" | "ok" | "none", where: "you" | "taranto", date }
+  // { day, alt, warm, rain, cloud, kind, temp, hours: [{ time, temp, mm }], weather: "wait" | "ok" | "none", where: "you" | "taranto", date }
   constructor({ onChange, clock = () => new Date() }) {
     this.onChange = onChange;
     this.clock = clock;
@@ -184,7 +197,7 @@ export class LiveMode {
     const w = this.weather === "ok" ? readWeather(this.forecast, date) : null;
     this.state = {
       day, alt, warm: 4 * day * (1 - day),
-      rain: w ? w.rain : 0, cloud: w ? w.cloud : 0.35, kind: w ? w.kind : null, temp: w ? w.temp : null,
+      rain: w ? w.rain : 0, cloud: w ? w.cloud : 0.35, kind: w ? w.kind : null, temp: w ? w.temp : null, hours: w ? w.hours : null,
       weather: w ? "ok" : this.weather === "ok" ? "none" : this.weather,
       where: this.where, date,
     };

@@ -130,7 +130,7 @@ export async function start({ data, root, force, toLofi }) {
   // Un "aspetto" e' { day, rain, cloud, warm } (vedi room.setSky). I due temi fissi sono due aspetti costanti;
   // nella modalita' "dal vivo" l'aspetto arriva da live.js, che calcola il sole e legge il meteo.
   const html = document.documentElement;
-  const FIXED = { dark: { day: 0, rain: 1, cloud: 0.66, warm: 0 }, light: { day: 1, rain: 1, cloud: 1, warm: 0 } };
+  const FIXED = { dark: { day: 0, rain: 1, cloud: 0.66, warm: 0 }, light: { day: 1, rain: 0, cloud: 0.22, warm: 0, haze: 0.35, sun: 1 } };   // chiaro: bella giornata, vetro asciutto, foschia leggera
   const themeMode = () => (html.dataset.themeMode === "live" ? "live" : html.dataset.theme === "light" ? "light" : "dark");
   const BG_NIGHT = new THREE.Color(0x050608), BG_DAY = new THREE.Color(0xdfe3e0);
   let look = null, rendered = false, fadeTimer = 0, fadeTo = null;
