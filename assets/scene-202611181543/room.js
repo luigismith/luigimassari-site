@@ -70,6 +70,49 @@ float coast(float az) {
   return HOR + 0.016 + 0.075 * n * n + 0.004 * d;
 }
 
+// --- Taranto: il canale navigabile con il ponte girevole e il castello aragonese ---------------
+// u = distanza dal centro del canale in mezze larghezze: |u| < 1 e' acqua (dietro, il Mar Grande).
+// A sinistra il borgo con i suoi isolati, a destra la citta' vecchia con le torri tonde del castello.
+const float AZB = 0.42;            // azimut del centro del canale
+const float HWB = 0.075;           // meta' larghezza del canale
+const float DECK = 0.017;          // quota dell'impalcato sopra l'acqua
+float townU(float az) { return (az - AZB) / HWB; }
+float townK(float u) { return 1.0 - smoothstep(2.3, 3.1, abs(u)); }
+const float T1 = 1.27, T2 = 1.87;  // centri delle due torri del castello
+float towers(float u) {
+  float a = 1.0 - smoothstep(0.150, 0.165, abs(u - T1));
+  float b = 1.0 - smoothstep(0.125, 0.140, abs(u - T2));
+  return max(a, b);
+}
+// luce su una torre tonda: piena al centro, in ombra ai bordi; piu' una riga scura sotto il coronamento
+float towerShade(float u, float y) {
+  float r = min(abs(u - T1) / 0.165, abs(u - T2) / 0.140);
+  float round = sqrt(max(1.0 - r * r, 0.0));
+  float cordon = 1.0 - 0.45 * (1.0 - smoothstep(0.0, 0.0011, abs(y - 0.0232)));
+  return (0.30 + 0.70 * round) * cordon;
+}
+bool inCastle(float u) { return u > 1.0 && u < 2.08; }
+float townProfile(float u) {
+  float h = 0.022 + 0.007 * step(0.45, h11(floor(u * 6.0) + 40.0));    // isolati del borgo
+  if (u > 0.0) h = 0.021 + 0.006 * step(0.5, h11(floor(u * 7.0) + 11.0)); // case della citta' vecchia
+  if (inCastle(u)) h = mix(0.0185, 0.0285, towers(u));                 // cortina del castello e torri
+  if (abs(u) < 1.0) h = 0.0;                                           // il canale
+  return h;
+}
+// profilo di tutto quello che sta sopra l'acqua: colline lontane e, intorno al canale, la citta'
+float skyline(float az) {
+  float u = townU(az);
+  return mix(coast(az), HOR + townProfile(u), townK(u));
+}
+// ponte girevole: due meta' che si incontrano al centro, con l'intradosso ad arco ribassato
+float bridgeUnder(float u) { return DECK - 0.0036 - 0.0094 * u * u; }
+float bridgeMask(float u, float y, float edge) {
+  float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
+  return step(abs(u), 1.12) * smoothstep(yb - edge, yb + edge, y) * (1.0 - smoothstep(DECK - edge, DECK + edge, y));
+}
+const int LAMPS = 11;              // lampioni sul parapetto
+float lampU(int i) { return -1.05 + float(i) * 0.21; }
+
 vec3 sky(float az, float el, float t) {
   float h = max(el - HOR, 0.0);
   vec3 col = mix(vec3(0.018, 0.024, 0.045), vec3(0.006, 0.009, 0.020), smoothstep(0.0, 0.35, h));
@@ -95,6 +138,7 @@ vec3 lightsAt(float az, float el, float blur, float coastEl, float t) {
       float sd = id * 1.37 + float(row) * 17.1;
       if (h11(sd) > (row == 0 ? 0.42 : 0.2)) continue;
       float a = (id + 0.5 + (h11(sd + 3.1) - 0.5) * 0.7) * cell;
+      if (abs(townU(a)) < 1.03) continue;                       // il canale e' acqua
       float e = HOR + 0.0022 + float(row) * 0.0045 + h11(sd + 5.3) * 0.0022;
       vec2 d = vec2(az - a, el - e);
       float g = exp(-dot(d, d) / (rad * rad));
@@ -114,6 +158,7 @@ vec3 lightsAt(float az, float el, float blur, float coastEl, float t) {
     vec2 p = (id + 0.5 + (h22(id) - 0.5) * 0.8) * vec2(0.008, 0.006);
     float pe = HOR + p.y;
     if (pe > coastEl - 0.003 || pe < HOR + 0.011) continue;
+    if (inCastle(townU(p.x))) continue;                         // il castello non ha finestre accese
     vec2 d = vec2(az - p.x, el - pe);
     float g = exp(-dot(d, d) / (rad * rad * 0.7));
     acc += (hs < 0.04 ? COLD : SODIUM) * g * 0.7;
@@ -152,6 +197,7 @@ vec3 water(float az, float el, float blur, float t) {
       float sd = id * 1.37 + float(row) * 17.1;
       if (h11(sd) > (row == 0 ? 0.42 : 0.2)) continue;
       float a = (id + 0.5 + (h11(sd + 3.1) - 0.5) * 0.7) * cell;
+      if (abs(townU(a)) < 1.03) continue;
       float wob = (vnoise(vec2(wp.y * 0.35 + id, t * 1.3)) - 0.5) * dep * 0.07;
       float w = 0.0006 + dep * 0.007 + blur * 0.0009;
       float dx = (az - a + wob) / w;
@@ -163,8 +209,55 @@ vec3 water(float az, float el, float blur, float t) {
       col += c * streak * broken * len * (row == 0 ? 0.75 : 0.35) * boost;
     }
   }
+  // riflessi del ponte girevole e del castello
+  float u = townU(az);
+  if (abs(u) < 2.3) {
+    float wobb = (vnoise(vec2(wp.y * 0.35 + 5.0, t * 1.3)) - 0.5) * dep * 0.07;
+    float uu = u + wobb / HWB;
+    float brk = smoothstep(0.3, 0.75, vnoise(vec2(u * 26.0, wp.y * 0.45 - t * 1.8)));
+    float w = 0.0006 + dep * 0.007 + blur * 0.0009;
+    for (int i = 0; i < LAMPS; i++) {
+      float dx = (uu - lampU(i)) * HWB / w;
+      col += vec3(1.0, 0.80, 0.52) * exp(-dx * dx) * brk * exp(-dep / 0.03) * 0.55;
+    }
+    if (abs(uu) < 1.0) {                                         // l'arco illuminato, capovolto
+      float da = (dep - bridgeUnder(uu)) / (0.0016 + dep * 0.22);
+      col += vec3(0.20, 0.40, 0.72) * exp(-da * da) * (0.35 + 0.65 * brk) * 0.7;
+    }
+    if (inCastle(uu)) col += vec3(0.34, 0.19, 0.07) * exp(-dep / 0.022) * (0.3 + 0.7 * brk);
+  }
   // riflesso rosso tremolante
   col += redLights(az + (vnoise(vec2(wp.y * 0.3, t)) - 0.5) * dep * 0.1, HOR + dep * 0.25 + 0.01, blur + 1.5, t) * 0.25 * exp(-dep / 0.05);
+  return col;
+}
+
+// facciate di notte: castello illuminato dal basso (pietra calda), case appena schiarite dai lampioni
+vec3 townNight(float u, float y) {
+  vec3 c = vec3(0.012, 0.011, 0.013) + vec3(0.07, 0.042, 0.02) * exp(-y / 0.007);
+  if (inCastle(u)) {
+    float shade = mix(0.42, towerShade(u, y), towers(u));          // cortina in ombra, torri tonde in luce
+    float foot = 0.35 + 0.65 * exp(-y / 0.014);
+    float stone = 0.85 + 0.15 * vnoise(vec2(u * 60.0, y * 1400.0));
+    c = vec3(0.66, 0.38, 0.14) * shade * foot * stone * 0.8;
+  }
+  return c;
+}
+vec3 bridgeNight(vec3 col, float u, float y, float blur) {
+  float edge = 0.0005 + blur * 0.0010;
+  float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
+  // trave d'acciaio illuminata dal basso con luce fredda
+  vec3 steel = vec3(0.03, 0.05, 0.085) + vec3(0.09, 0.20, 0.40) * exp(-max(y - yb, 0.0) / 0.0030);
+  steel *= 1.0 - 0.5 * exp(-abs(u) / 0.012);                    // il giunto al centro, dove le due meta' si toccano
+  col = mix(col, steel, bridgeMask(u, y, edge));
+  if (abs(u) < 1.0) {                                           // filo di luce lungo l'arco
+    float da = (y - yb) / (0.0007 + blur * 0.0011);
+    col += vec3(0.35, 0.62, 1.0) * exp(-da * da) * 1.0;
+  }
+  float rad = 0.0010 + blur * 0.0012;
+  for (int i = 0; i < LAMPS; i++) {
+    vec2 d = vec2((u - lampU(i)) * HWB, y - (DECK + 0.0042));
+    col += vec3(1.0, 0.80, 0.52) * exp(-dot(d, d) / (rad * rad)) * 1.6;
+  }
   return col;
 }
 
@@ -175,13 +268,16 @@ vec3 outside(vec3 dir, float blur, float t) {
   if (el < HOR) {
     col = water(az, el, blur, t);
   } else {
-    float ce = coast(az);
+    float u = townU(az), y = el - HOR;
+    float ce = skyline(az);
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
     vec3 hill = vec3(0.008, 0.008, 0.011) + vec3(0.025, 0.014, 0.008) * exp(-(el - HOR) / 0.02);
+    if (abs(u) < 3.1) hill = mix(hill, townNight(u, y), townK(u));
     col = mix(sky(az, el, t), hill, land);
     col += lightsAt(az, el, blur, ce, t);
     col += redLights(az, el, blur, t);
+    if (abs(u) < 1.4) col = bridgeNight(col, u, y, blur);
   }
   // foschia sul pelo dell'acqua
   col += vec3(0.05, 0.04, 0.035) * exp(-abs(el - HOR) / 0.006) * 0.5;
@@ -195,6 +291,16 @@ vec3 daySky(float az, float el, float t) {
   float c = fbm(vec2(az * 3.2 - t * 0.012, el * 9.0 + 2.0));
   return mix(col, vec3(0.72, 0.74, 0.76), smoothstep(0.42, 0.78, c) * 0.7);
 }
+vec3 townDay(float u, float y) {
+  // case chiare con le file di finestre
+  float win = step(0.55, fract(u * 18.0)) * step(0.5, fract(y / 0.0042)) * step(0.006, y);
+  vec3 c = mix(vec3(0.62, 0.61, 0.58), vec3(0.36, 0.38, 0.40), win * 0.7) * (0.9 + 0.1 * h11(floor(u * 6.0)));
+  if (inCastle(u)) {
+    float shade = mix(0.74, 0.55 + 0.45 * towerShade(u, y), towers(u));
+    c = vec3(0.56, 0.50, 0.41) * shade * (0.92 + 0.08 * vnoise(vec2(u * 60.0, y * 1400.0)));
+  }
+  return c;
+}
 vec3 dayOutside(vec3 dir, float blur, float t) {
   float az = atan(dir.x, -dir.z);
   float el = asin(clamp(dir.y, -1.0, 1.0));
@@ -205,12 +311,30 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
     col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
     col = mix(col, daySky(az, HOR + dep, t), 0.25);
+    float u = townU(az) + rip * 0.25;                            // riflesso scuro del ponte e chiaro del castello
+    if (abs(u) < 1.0) col *= 1.0 - 0.28 * smoothstep(bridgeUnder(u) - 0.004, bridgeUnder(u), dep) * (1.0 - smoothstep(DECK, DECK + 0.006, dep));
+    if (inCastle(u)) col = mix(col, vec3(0.50, 0.47, 0.42), 0.22 * exp(-dep / 0.03));
   } else {
-    float ce = coast(az);
+    float u = townU(az), y = el - HOR;
+    float ce = skyline(az);
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
     vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR));
+    if (abs(u) < 3.1) hill = mix(hill, townDay(u, y), townK(u));
     col = mix(daySky(az, el, t), hill, land);
+    if (abs(u) < 1.4) {                                          // ponte girevole: acciaio grigio azzurro, parapetto e lampioni
+      float be = 0.0005 + blur * 0.0010;
+      float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
+      vec3 steel = mix(vec3(0.12, 0.16, 0.20), vec3(0.26, 0.33, 0.38), smoothstep(yb, DECK, y));
+      steel *= 1.0 - 0.4 * exp(-abs(u) / 0.012);
+      col = mix(col, steel, bridgeMask(u, y, be));
+      float rail = (1.0 - smoothstep(0.0, 0.0012 + be, abs(y - DECK - 0.0012))) * step(abs(u), 1.12);
+      col = mix(col, vec3(0.16, 0.19, 0.22), rail * 0.8);
+      for (int i = 0; i < LAMPS; i++) {
+        float post = (1.0 - smoothstep(0.0, 0.0011 + be, abs(u - lampU(i)) * HWB)) * step(DECK, y) * (1.0 - smoothstep(DECK + 0.0048, DECK + 0.0056, y));
+        col = mix(col, vec3(0.15, 0.18, 0.20), post * 0.85);
+      }
+    }
   }
   return col;
 }

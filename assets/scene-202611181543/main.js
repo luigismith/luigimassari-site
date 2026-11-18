@@ -23,7 +23,7 @@ export const VIEWS = {
   shop: { pos: V(0.6, 1.42, 0.98), target: V(0.6, 0.84, -0.04), fov: 40 },
   about: { pos: V(0.06, 1.2, 0.5), target: V(0.11, 0.77, 0.06), fov: 40 },
   contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },
-  lab: { pos: V(0.45, 1.44, 0.82), target: V(1.14, 1.3, -0.02), fov: 40 },
+  lab: { pos: V(0.02, 1.36, 0.1), target: V(1.3, 1.33, -0.2), fov: 42 },
 };
 
 // vignettatura e grana leggere, dopo l'OutputPass (spazio sRGB)
@@ -182,7 +182,7 @@ export async function start({ data, root, force, toLofi }) {
   addHit(extras.printer, "print");
   addHit(objects.sections.about, "about");
   addHit(objects.sections.contact, "contact");
-  addHit(extras.tv, "lab");
+  addHit(extras.board, "lab");
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
@@ -203,7 +203,10 @@ export async function start({ data, root, force, toLofi }) {
   addTag("print", hitOf("print")[0].userData.top, 24);
   const synthTops = hitOf("shop").map((m) => m.userData.top);
   addTag("shop", synthTops.reduce((acc, p) => acc.add(p), V(0, 0, 0)).multiplyScalar(1 / synthTops.length).setY(Math.max(...synthTops.map((p) => p.y))), 44);
-  addTag("lab", hitOf("lab")[0].userData.top, 20);
+  { // la lavagna arriva quasi alla barra: la sua etichetta sta sotto, come una didascalia
+    const h = hitOf("lab")[0];
+    addTag("lab", V(h.position.x, h.position.y - h.geometry.parameters.height / 2 - 0.1, h.position.z), 0);
+  }
   addTag("contact", hitOf("contact")[0].userData.top, 22);
   const tagPos = new THREE.Vector3();
   const TAG_MIN_Y = 132; // px dal bordo alto: barra (circa 80) + altezza dell'etichetta

@@ -319,40 +319,68 @@ function mushroomLamp() {
   return g;
 }
 
-// televisore sferico su una mensola: sullo schermo il programma della Formazione (e' l'oggetto di quella sezione)
-function sphereTv(M, lab) {
+// Formazione: lavagna di vetro sulla parete destra, con il programma scritto in luce (e' l'oggetto di quella sezione).
+// Stessa famiglia del monitor traslucido: vetro fume', scritte piene, un filo di luce ambra sul bordo alto.
+function glassBoard(M, lab, label) {
   const g = new THREE.Group();
-  g.name = "tv";
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.13, 48, 32), new THREE.MeshStandardMaterial({ color: 0xece7da, roughness: 0.28, metalness: 0.05 }));
-  shell.scale.z = 0.92;
-  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.105, 0.03, 48), std(0x0b0f14, 0.3, 0.2));
-  face.rotation.x = Math.PI / 2;
-  face.position.z = 0.117;
-  const c = canvas(512, 384), x = c.getContext("2d");
-  x.fillStyle = "#0A1622"; x.fillRect(0, 0, 512, 384);
-  x.fillStyle = "#FFB44A"; x.font = `800 46px ${FONT}`;
-  let line = "", y = 76;
-  for (const word of lab.h.split(" ")) {
-    if (line && x.measureText(line + " " + word).width > 440) { x.fillText(line, 36, y); y += 52; line = word; } else line = line ? line + " " + word : word;
+  g.name = "board";
+  const W = 0.46, H = 0.62, CW = 736, CH = 992, PAD = 56, INNER = CW - PAD * 2;
+  const c = canvas(CW, CH), x = c.getContext("2d");
+  x.fillStyle = "rgba(8, 15, 24, 0.5)";
+  x.fillRect(0, 0, CW, CH);
+  // va a capo sulle parole e restituisce la quota della riga successiva
+  const wrap = (text, y, lineH, maxLines = 9) => {
+    let line = "", n = 0;
+    for (const word of text.split(" ")) {
+      const probe = line ? line + " " + word : word;
+      if (line && x.measureText(probe).width > INNER) {
+        if (++n === maxLines) { x.fillText(line + "…", PAD, y); return y + lineH; }
+        x.fillText(line, PAD, y); y += lineH; line = word;
+      } else line = probe;
+    }
+    x.fillText(line, PAD, y);
+    return y + lineH;
+  };
+  x.fillStyle = "#9DB0BF"; x.font = `650 30px ${FONT}`;
+  x.fillText(label, PAD, 82);
+  x.fillStyle = "#FFB44A"; x.fillRect(PAD, 104, INNER, 3);
+  x.font = `800 82px ${FONT}`;
+  let y = wrap(lab.h, 204, 86, 3) - 86 + 62;
+  for (const [title, text] of lab.items) {
+    x.fillStyle = "rgba(238, 241, 236, 0.28)"; x.fillRect(PAD, y, INNER, 2);
+    x.fillStyle = "#EEF1EC"; x.font = `650 36px ${FONT}`;
+    x.fillText(title, PAD, y + 50);
+    x.fillStyle = "#9DB0BF"; x.font = `400 22px ${FONT}`;
+    wrap(text, y + 86, 28, 3);
+    y += 172;
   }
-  x.fillText(line, 36, y);
-  y += 62;
-  x.font = `600 30px ${FONT}`;
-  for (const [title] of lab.items) {
-    x.fillStyle = "#FFB44A"; x.beginPath(); x.arc(46, y - 10, 7, 0, Math.PI * 2); x.fill();
-    x.fillStyle = "#EEF1EC"; x.fillText(title, 68, y);
-    y += 50;
+  // in basso la scala di sintonia del sito, con l'ago
+  const step = INNER / 52, y0 = CH - 92;
+  x.fillStyle = "rgba(238, 241, 236, 0.5)";
+  for (let i = 0; i <= 52; i++) x.fillRect(PAD + i * step - 1, y0, 2, i % 6 === 0 ? 30 : 15);
+  x.fillStyle = "#FFB44A"; x.fillRect(PAD + 30 * step - 2, y0 - 14, 4, 58);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.006),
+    new THREE.MeshBasicMaterial({ color: 0x050b12, transparent: true, opacity: 0.42, depthWrite: false }));
+  glass.renderOrder = 1;
+  glass.userData.dynamic = true; // vetro e scritte restano mesh separate: le trasparenze si disegnano in ordine
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({ map: tex(c), color: new THREE.Color(1.35, 1.35, 1.35), transparent: true, depthWrite: false }));
+  face.position.z = 0.0045;
+  face.renderOrder = 2;
+  face.userData.dynamic = true;
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(W, 0.004, 0.008), lit(2.2, 1.3, 0.45));
+  edge.position.y = H / 2 + 0.002;
+  g.add(glass, face, edge);
+  // quattro distanziali cromati la tengono staccata dal muro
+  const pinGeo = new THREE.CylinderGeometry(0.006, 0.006, 0.04, 14), capGeo = new THREE.CylinderGeometry(0.011, 0.011, 0.004, 20);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const pin = new THREE.Mesh(pinGeo, M.steel), cap = new THREE.Mesh(capGeo, M.steel);
+    pin.rotation.x = cap.rotation.x = Math.PI / 2;
+    pin.position.set(sx * (W / 2 - 0.028), sy * (H / 2 - 0.028), -0.02);
+    cap.position.set(sx * (W / 2 - 0.028), sy * (H / 2 - 0.028), 0.006);
+    g.add(pin, cap);
   }
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.1125), new THREE.MeshBasicMaterial({ map: tex(c, { mips: false }), color: new THREE.Color(1.3, 1.3, 1.3) }));
-  screen.position.z = 0.1325;
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.006, 10, 48), std(0xff6a1a, 0.25));
-  ring.position.z = 0.129;
-  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 32), M.dark);
-  foot.position.y = -0.14;
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.17, 6), M.steel);
-  antenna.position.set(0.04, 0.2, -0.02);
-  antenna.rotation.z = -0.35;
-  g.add(shell, face, screen, ring, foot, antenna);
   return g;
 }
 
@@ -387,14 +415,10 @@ export function createExtras(data) {
   notes.add(block);
   place(notes, -0.03, 0.32, 0.12);
   place(mushroomLamp(), -0.665, -0.31); // tra la stampante e il monitor
-  const tv = sphereTv(M, data.lab);
-  tv.position.set(1.14, 1.3, -0.02);
-  tv.rotation.y = -0.75;
-  shadow(tv);
-  const shelf = box(0.3, 0.02, 0.26, M.dark, 0.004, 1);
-  shelf.position.set(1.15, 1.135, -0.02);
-  shadow(shelf);
-  root.add(tv, shelf);
+  const board = glassBoard(M, data.lab, data.ui.labels.lab);
+  board.position.set(1.3 - 0.043, 1.33, -0.02);   // parete destra, rivolta verso la stanza
+  board.rotation.y = -Math.PI / 2;
+  root.add(board);
   for (const child of root.children) mergeStatic(child);
-  return { group: root, printer: printerObj.group, tv, update: printerObj.update };
+  return { group: root, printer: printerObj.group, board, update: printerObj.update };
 }
