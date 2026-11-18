@@ -24,20 +24,6 @@ export function shadow(o, cast = true, receive = true) {
   o.traverse((c) => { if (c.isMesh) { c.castShadow = cast; c.receiveShadow = receive; } });
   return o;
 }
-function helix(a, b, radius, turns, wire, mat) {
-  const dir = new THREE.Vector3().subVectors(b, a);
-  const len = dir.length();
-  const pts = [];
-  const N = turns * 12;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N, ang = t * turns * Math.PI * 2;
-    pts.push(new THREE.Vector3(Math.cos(ang) * radius, t * len, Math.sin(ang) * radius));
-  }
-  const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), N * 2, wire, 5, false), mat);
-  m.position.copy(a);
-  m.quaternion.setFromUnitVectors(_up, dir.normalize());
-  return m;
-}
 // Unisce le mesh statiche che condividono lo stesso materiale (meno chiamate di disegno).
 // Restano separati: InstancedMesh, Points e tutto cio' che sta sotto un nodo con userData.dynamic.
 export function mergeStatic(root) {
@@ -85,7 +71,7 @@ export function createDesk() {
   const wood = woodTextures();
   const top = new THREE.Mesh(
     new RoundedBoxGeometry(DESK.w, 0.05, DESK.d, 3, 0.012),
-    new THREE.MeshStandardMaterial({ map: wood.map, roughnessMap: wood.roughnessMap, roughness: 1, metalness: 0 })
+    new THREE.MeshStandardMaterial({ map: wood.map, roughnessMap: wood.roughnessMap, roughness: 0.78, metalness: 0 })
   );
   top.position.set(0, DESK.y - 0.025, 0);
   top.receiveShadow = true; top.castShadow = true;
@@ -104,86 +90,35 @@ export function createDesk() {
   const apron = box(DESK.w - 0.1, 0.08, 0.02, legMat, 0.006);
   apron.position.set(0, DESK.y - 0.09, DESK.z1 - 0.06);
   g.add(apron);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(DESK.w - 0.06, 0.004, 0.004), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.0, 1.2, 0.4) }));
+  edge.position.set(0, DESK.y - 0.052, DESK.z1 - 0.003);
+  g.add(edge);
   return { group: g, woodMap: wood.map };
 }
 
-// --- lampada da banco a braccio snodato ------------------------------------
+// --- lampada: barra LED su stelo sottile ---------------------------------------
 export function createLamp() {
   const g = new THREE.Group();
   g.name = "lamp";
-  const red = new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.62, metalness: 0.05, roughnessMap: noiseRoughness(9, 150, 30) });
-  const steel = new THREE.MeshStandardMaterial({ color: 0x8e9399, roughness: 0.3, metalness: 1 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x18191c, roughness: 0.45, metalness: 0.4 });
-
-  const base = V(-0.98, DESK.y, -0.27);
-  const p0 = base.clone().add(V(0, 0.07, 0));
-  const p1 = V(-0.88, 1.3, -0.26);
-  const p2 = V(-0.3, 1.44, -0.06);
-  const target = V(-0.24, DESK.y, 0.02);
-
-  const baseGeo = new THREE.LatheGeometry([
-    new THREE.Vector2(0, 0), new THREE.Vector2(0.095, 0), new THREE.Vector2(0.098, 0.006),
-    new THREE.Vector2(0.094, 0.022), new THREE.Vector2(0.05, 0.03), new THREE.Vector2(0.03, 0.04), new THREE.Vector2(0, 0.04),
-  ], 48);
-  const b = new THREE.Mesh(baseGeo, red);
-  b.position.copy(base);
-  g.add(b);
-  const pivot0 = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.05, 20), dark);
-  pivot0.rotation.x = Math.PI / 2;
-  pivot0.position.copy(p0);
-  g.add(pivot0);
-  g.add(rod(base.clone().add(V(0, 0.03, 0)), p0, 0.012, red));
-
-  const side = V(0, 0, 0.016);
-  for (const s of [1, -1]) {
-    g.add(rod(p0.clone().addScaledVector(side, s), p1.clone().addScaledVector(side, s), 0.0065, red));
-    g.add(rod(p1.clone().addScaledVector(side, s), p2.clone().addScaledVector(side, s), 0.0058, red));
-  }
-  g.add(helix(p0.clone().add(V(0.03, 0.04, 0)), p1.clone().add(V(0.05, -0.1, 0)), 0.006, 26, 0.0011, steel));
-  g.add(helix(p1.clone().add(V(0.06, -0.01, 0)), p2.clone().add(V(-0.12, -0.03, 0)), 0.005, 22, 0.001, steel));
-  const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 20), dark);
-  knuckle.rotation.x = Math.PI / 2;
-  knuckle.position.copy(p1);
-  g.add(knuckle);
-  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.016, 16), steel);
-  knob.rotation.x = Math.PI / 2;
-  knob.position.copy(p1).add(V(0, 0, 0.033));
-  g.add(knob);
-
-  // testa: paralume tornito (profilo dal bordo verso l'alto: normali verso l'esterno)
-  const head = new THREE.Group();
-  head.position.copy(p2);
-  const axis = new THREE.Vector3().subVectors(target, p2).normalize();
-  head.quaternion.setFromUnitVectors(V(0, -1, 0), axis);
-  const prof = [
-    [0.091, -0.118], [0.088, -0.11], [0.078, -0.075], [0.05, -0.02], [0.034, 0.012], [0.03, 0.03], [0.018, 0.035],
-  ].map(([x, y]) => new THREE.Vector2(x, y));
-  const shadeOut = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), red);
-  const shadeIn = new THREE.Mesh(new THREE.LatheGeometry(prof, 64),
-    new THREE.MeshStandardMaterial({ color: 0xeee6d8, roughness: 0.5, emissive: 0xffb877, emissiveIntensity: 0.35, side: THREE.BackSide }));
-  shadeIn.scale.setScalar(0.985);
-  head.add(shadeOut, shadeIn);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.02, 20), dark);
-  cap.position.y = 0.045;
-  head.add(cap);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 32, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd9a8, emissiveIntensity: 14, roughness: 0.2 }));
-  bulb.position.y = -0.045;
-  bulb.scale.set(1, 1.15, 1);
-  head.add(bulb);
-  g.add(head);
-  const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.045, 16), dark);
-  yoke.rotation.x = Math.PI / 2;
-  yoke.position.copy(p2);
-  g.add(yoke);
-
+  const metal = new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.35, metalness: 0.85 });
+  const base = V(-0.99, DESK.y, -0.3);
+  const barA = V(-0.99, 1.3, -0.3), barB = V(-0.16, 1.3, -0.1);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, 0.012, 40), metal);
+  foot.position.copy(base).add(V(0, 0.006, 0));
+  g.add(foot, rod(base, barA, 0.008, metal), rod(barA, barB, 0.011, metal, 12));
+  // striscia luminosa sotto la barra: e' lei che fa bloom
+  const dir = new THREE.Vector3().subVectors(barB, barA);
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.004, dir.length() * 0.72), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2.2, 1.2) }));
+  strip.position.copy(barA).addScaledVector(dir, 0.6).add(V(0, -0.012, 0));
+  strip.lookAt(strip.position.clone().add(dir));
+  g.add(strip);
   shadow(g, true, true);
-  bulb.castShadow = false; shadeIn.castShadow = false;
+  strip.castShadow = false;
 
   // unica luce calda forte
-  const spot = new THREE.SpotLight(0xffc690, 1.5, 4.5, 0.8, 0.75, 2);
-  spot.position.copy(p2).addScaledVector(axis, 0.03);
-  spot.target.position.copy(target);
+  const spot = new THREE.SpotLight(0xffd0a0, 1.7, 4.5, 0.85, 0.8, 2);
+  spot.position.copy(strip.position).add(V(0, -0.012, 0));
+  spot.target.position.set(-0.2, DESK.y, 0.04);
   spot.castShadow = true;
   spot.shadow.mapSize.set(2048, 2048);
   spot.shadow.bias = -0.0003;
@@ -195,8 +130,7 @@ export function createLamp() {
   const bounce = new THREE.PointLight(0xffb070, 0.22, 1.6, 2);
   bounce.position.set(-0.3, 1.3, 0.25);
   g.add(bounce);
-
-  return { group: g, spot, bulb, head };
+  return { group: g, spot, bulb: strip, head: strip };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,12 +185,12 @@ void main(){
   vec2 uv = vUv;
   vec2 grid = abs(fract(uv * vec2(10.0, 8.0)) - 0.5);
   float gl = smoothstep(0.485, 0.5, max(grid.x, grid.y));
-  vec3 col = vec3(0.004, 0.018, 0.012) + vec3(0.02, 0.06, 0.04) * gl;
+  vec3 col = vec3(0.016, 0.011, 0.004) + vec3(0.06, 0.04, 0.015) * gl;
   float t = uTime;
   float x = uv.x * 6.2831 * 2.0;
   float y = 0.5 + 0.22 * sin(x + t * 2.0) * (0.75 + 0.25 * sin(t * 0.7)) + 0.07 * sin(x * 3.0 - t * 3.1) + 0.03 * sin(x * 7.0 + t);
   float d = abs(uv.y - y);
-  col += vec3(0.55, 1.0, 0.45) * (exp(-d * d / 0.00006) * 2.6 + exp(-d * d / 0.002) * 0.35);
+  col += vec3(1.0, 0.66, 0.25) * (exp(-d * d / 0.00006) * 2.6 + exp(-d * d / 0.002) * 0.35);
   vec2 q = abs(uv - 0.5) * 2.0;
   col *= smoothstep(1.0, 0.86, max(pow(q.x, 6.0), pow(q.y, 6.0)));
   gl_FragColor = vec4(col, 1.0);
@@ -266,7 +200,7 @@ function createScope(M) {
   const g = new THREE.Group();
   g.name = "scope";
   const W = 0.21, H = 0.15, D = 0.23;
-  const body = box(W, H, D, new THREE.MeshStandardMaterial({ color: 0xbcb8ad, roughness: 0.6 }), 0.008, 3);
+  const body = box(W, H, D, new THREE.MeshStandardMaterial({ color: 0x1b2129, roughness: 0.45, metalness: 0.55 }), 0.008, 3);
   body.position.y = H / 2 + 0.01;
   g.add(body);
   const fw = W - 0.012, fh = H - 0.012;
@@ -310,11 +244,11 @@ function createScope(M) {
 // ---------------------------------------------------------------------------
 // Monitor con codice vivo + tastiera
 // ---------------------------------------------------------------------------
-function createMonitor(M) {
+function createMonitor(M, data) {
   const g = new THREE.Group();
   g.name = "monitor";
   const sw = 0.56, sh = 0.35;
-  const code = new CodeScreen(1280, 800);
+  const code = new CodeScreen(1280, 800, data.ui.assistant);
   const head = new THREE.Group();
   head.position.set(0, 0.25, -0.03);
   head.rotation.x = -0.06;
@@ -666,44 +600,6 @@ function patchCable(M, color, pts) {
   return shadow(g);
 }
 
-function smallParts(M) {
-  const g = new THREE.Group();
-  g.name = "parts";
-  let seed = 99;
-  const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = V(1, 1, 1);
-  const Y = DESK.y;
-  const screws = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.0028, 0.0028, 0.0022, 12), M.steel, 9);
-  for (let i = 0; i < 9; i++) {
-    m4.compose(V(-0.22 + r() * 0.17, Y + 0.0011, 0.26 + r() * 0.1), q.setFromEuler(e.set(0, r() * 3, 0)), one);
-    screws.setMatrixAt(i, m4);
-  }
-  g.add(screws);
-  const resBody = new THREE.CapsuleGeometry(0.0022, 0.006, 4, 10).rotateZ(Math.PI / 2);
-  const resLead = new THREE.CylinderGeometry(0.00035, 0.00035, 0.036, 5).rotateZ(Math.PI / 2);
-  const resM = new THREE.InstancedMesh(resBody, new THREE.MeshStandardMaterial({ color: 0xd8c193, roughness: 0.6 }), 6);
-  const leadM = new THREE.InstancedMesh(resLead, M.steel, 6);
-  for (let i = 0; i < 6; i++) {
-    m4.compose(V(-0.2 + r() * 0.16, Y + 0.0024, 0.27 + r() * 0.09), q.setFromEuler(e.set(0, r() * 3.14, 0)), one);
-    resM.setMatrixAt(i, m4); leadM.setMatrixAt(i, m4);
-  }
-  g.add(resM, leadM);
-  const caps = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.009, 14), new THREE.MeshStandardMaterial({ color: 0x23395b, roughness: 0.4 }), 4);
-  for (let i = 0; i < 4; i++) {
-    m4.compose(V(-0.12 + r() * 0.1, Y + 0.0035, 0.3 + r() * 0.06), q.setFromEuler(e.set(Math.PI / 2, r() * 3, 0)), one);
-    caps.setMatrixAt(i, m4);
-  }
-  g.add(caps);
-  // un circuito stampato in lavorazione
-  const pcb = box(0.09, 0.0016, 0.06, new THREE.MeshStandardMaterial({ color: 0x1f5a3a, roughness: 0.45, metalness: 0.1 }), 0.0006, 1);
-  pcb.position.set(-0.3, Y + 0.0008, 0.33); pcb.rotation.y = 0.3;
-  const chip = box(0.022, 0.004, 0.01, M.black, 0.0008, 1);
-  chip.position.set(-0.3, Y + 0.0035, 0.33); chip.rotation.y = 0.3;
-  g.add(pcb, chip);
-  shadow(g);
-  return g;
-}
-
 // ---------------------------------------------------------------------------
 // Tutti gli oggetti del banco
 // ---------------------------------------------------------------------------
@@ -720,7 +616,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   place(scope.group, -0.83, 0.13, 0.42);
   updaters.push(scope.update);
 
-  const monitor = createMonitor(M);
+  const monitor = createMonitor(M, data);
   place(monitor.group, -0.45, -0.2, 0.12);
   updaters.push(monitor.update);
   sections.dev = monitor.group;
@@ -764,7 +660,6 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   updaters.push(station.update);
   place(createSpool(M).group, 0.22, -0.3, 0.4);
   place(createMug().group, -0.1, -0.19, 2.4);
-  root.add(smallParts(M));
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;
@@ -783,10 +678,9 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   if (a2) root.add(patchCable(M, 0xf2a33a, [a2, up(a2, 0.04), V(a2.x + 0.06, Y + 0.03, a2.z + 0.09), V(0.84, Y + 0.004, 0.27), V(recOut.x - 0.02, Y + 0.006, recOut.z + 0.05), recOut, recIn]));
   const a3 = jackW("open-orc", 1);
   if (a3) root.add(patchCable(M, 0xe9ece6, [a3, up(a3, 0.03), V(a3.x + 0.05, Y + 0.09, -0.36), V(a3.x + 0.12, Y + 0.004, -0.3), V(a3.x + 0.16, Y + 0.004, -0.2), V(a3.x + 0.12, Y + 0.004, -0.15)]));
-  root.add(patchCable(M, 0x2f6fb0, [V(-0.12, Y + 0.004, 0.36), V(-0.08, Y + 0.004, 0.3), V(-0.16, Y + 0.004, 0.27), V(-0.2, Y + 0.004, 0.33), V(-0.13, Y + 0.004, 0.37), V(-0.04, Y + 0.004, 0.35)]));
   onProgress(1);
 
-  // --- tocco cyberpunk: insegna al neon a forma d'onda e striscia LED sul fondo del banco ---
+  // --- ologramma dello spettro e striscia LED sul fondo del banco ---
   const neon = createNeon();
   root.add(neon.group);
   updaters.push(neon.update);
@@ -808,46 +702,52 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   };
 }
 
-// insegna al neon: una forma d'onda rosso segnale sotto il davanzale, dietro i synth,
-// e una striscia LED ambra lungo il bordo posteriore del banco
+// ologramma dello spettro sopra i synth (proiettato da una barra sulla mensola della vetrata)
+// e striscia LED ambra lungo il bordo posteriore del banco
+const HOLO_FRAG = /* glsl */ `
+uniform float uTime; varying vec2 vUv;
+float h(float x) { return fract(sin(x * 127.1) * 43758.5453); }
+void main() {
+  vec2 uv = vUv;
+  float n = 30.0, i = floor(uv.x * n), fx = fract(uv.x * n);
+  float lvl = (0.18 + 0.5 * abs(sin(uTime * (0.7 + h(i) * 1.6) + i * 0.6))) * (0.45 + 0.55 * h(i + 3.0)) * sin(uv.x * 3.14159);
+  float bar = step(0.2, fx) * step(fx, 0.8) * step(uv.y, lvl * 0.78) * step(0.3, fract(uv.y * 24.0));
+  float y = 0.7 + 0.07 * sin(uv.x * 20.0 + uTime * 2.0) * sin(uv.x * 3.14159);
+  float line = exp(-pow((uv.y - y) / 0.012, 2.0));
+  vec3 amber = vec3(1.0, 0.66, 0.25), red = vec3(1.0, 0.32, 0.2);
+  float edge = smoothstep(0.0, 0.05, uv.x) * smoothstep(1.0, 0.95, uv.x);
+  float scan = 0.82 + 0.18 * sin(uv.y * 260.0 + uTime * 5.0);
+  vec3 col = (mix(amber, red, smoothstep(0.25, 0.55, uv.y)) * bar * 0.6 + amber * line * 1.1) * edge * scan;
+  gl_FragColor = vec4(col, (bar * 0.7 + line) * edge);
+}`;
+
 function createNeon() {
   const g = new THREE.Group();
   g.name = "neon";
-  const Y = DESK.y, z = -0.488;
-  const pts = [];
-  for (let i = 0; i <= 160; i++) {
-    const u = i / 160, x = 0.26 + u * 0.66;
-    const env = Math.sin(u * Math.PI);
-    pts.push(V(x, Y + 0.16 + Math.sin(u * Math.PI * 7) * 0.045 * env + Math.sin(u * Math.PI * 19) * 0.008 * env, z));
-  }
-  const wave = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, 0.0035, 8),
-    new THREE.MeshStandardMaterial({ color: 0x220008, emissive: 0xff4a2a, emissiveIntensity: 3.2 }));
-  g.add(wave);
-  // supporti trasparenti e cavetto
-  const clipMat = new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.2, transparent: true, opacity: 0.5 });
-  for (const x of [0.32, 0.59, 0.86]) {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.012, 10), clipMat);
-    c.rotation.x = Math.PI / 2; c.position.set(x, Y + 0.16, z - 0.006);
-    g.add(c);
-  }
+  const Y = DESK.y;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
+    fragmentShader: HOLO_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  const holo = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.26), mat);
+  holo.position.set(0.61, 0.875 + 0.13, -0.46);
+  holo.userData.dynamic = true;
+  g.add(holo);
+  const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.012, 0.016), new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.4, metalness: 0.8 }));
+  emitter.position.set(0.61, 0.856, -0.46);
+  g.add(emitter);
   const strip = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.006, 0.008),
     new THREE.MeshStandardMaterial({ color: 0x140a00, emissive: 0xffa23c, emissiveIntensity: 2.4 }));
   strip.position.set(-0.44, Y + 0.004, DESK.z0 + 0.006);
   g.add(strip);
-  // luce colorata sul muro
-  const pink = new THREE.PointLight(0xff5a3d, 0.22, 0.9, 2);
-  pink.position.set(0.59, Y + 0.26, z + 0.025);
-  const cyan = new THREE.PointLight(0xffa64a, 0.18, 1.0, 2);
-  cyan.position.set(-0.2, Y + 0.12, z + 0.02);
-  g.add(pink, cyan);
-  const mat = wave.material;
-  return {
-    group: g,
-    // un neon vero ogni tanto sfarfalla
-    update(t) {
-      const f = Math.sin(t * 0.7) > 0.985 ? 0.35 + 0.65 * Math.abs(Math.sin(t * 90)) : 1;
-      mat.emissiveIntensity = 3.2 * f;
-      pink.intensity = 0.22 * f;
-    },
-  };
+  const glow = new THREE.PointLight(0xff6a3d, 0.06, 0.9, 2);
+  glow.position.set(0.61, 1.05, -0.42);
+  const amber = new THREE.PointLight(0xffa64a, 0.18, 1.0, 2);
+  amber.position.set(-0.2, Y + 0.12, -0.468);
+  // luce morbida sugli strumenti: sono i prodotti, devono leggersi bene
+  const key = new THREE.PointLight(0xffe2c2, 0.5, 1.7, 2);
+  key.position.set(0.62, 1.32, 0.32);
+  g.add(glow, amber, key);
+  return { group: g, update(t) { mat.uniforms.uTime.value = t; } };
 }

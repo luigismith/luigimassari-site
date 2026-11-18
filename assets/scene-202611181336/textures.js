@@ -67,7 +67,7 @@ export function woodTextures(seed = 7) {
   const W = 1024, H = 512, r = rng(seed), n = fbmField(seed + 1, 3);
   const c = canvas(W, H), g = c.getContext("2d");
   const grad = g.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#6e4a30"); grad.addColorStop(0.5, "#7a5236"); grad.addColorStop(1, "#68452c");
+  grad.addColorStop(0, "#241c18"); grad.addColorStop(0.5, "#2b221d"); grad.addColorStop(1, "#211a16");
   g.fillStyle = grad; g.fillRect(0, 0, W, H);
   // tavole: tre doghe con tono leggermente diverso
   const planks = [0, 170, 345, 512];
@@ -143,17 +143,6 @@ export function plasterTextures(seed = 3) {
   }
   g.putImageData(img, 0, 0); bg.putImageData(bimg, 0, 0);
   return { map: tex(c, { repeat: [4, 3], mirror: true }), bumpMap: tex(bump, { srgb: false, repeat: [4, 3], mirror: true }) };
-}
-
-// --- stoffa delle tende ---------------------------------------------------
-export function fabricTexture() {
-  const S = 256, c = canvas(S, S), g = c.getContext("2d"), r = rng(11);
-  g.fillStyle = "#6a4e36"; g.fillRect(0, 0, S, S);
-  for (let i = 0; i < S; i += 2) {
-    g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.07})`; g.fillRect(i, 0, 1, S);
-    g.fillStyle = `rgba(255,230,200,${0.02 + r() * 0.04})`; g.fillRect(0, i, S, 1);
-  }
-  return tex(c, { repeat: [4, 6] });
 }
 
 // --- poster "ICHOS — Suoni a margine" -------------------------------------
@@ -352,7 +341,9 @@ function tokenize(line, lang) {
 // caricare la texture sulla GPU costa, quindi canvas 1280x800 e al massimo 12 aggiornamenti al secondo).
 const LW = 1536, LH = 960;
 export class CodeScreen {
-  constructor(w = 1280, h = 800) {
+  // chat: { title, q, a: [righe] } da content.py: l'assistente AI nel riquadro di destra
+  constructor(w = 1280, h = 800, chat = null) {
+    this.chat = chat; this.chatT = 0; this.chatKey = "";
     this.c = canvas(w, h);
     this.g = this.c.getContext("2d");
     this.k = w / LW;
@@ -362,8 +353,45 @@ export class CodeScreen {
     this.rows = Math.floor((LH - this.top - 56) / this.lineH);
     this.draw();
   }
+  // quanti caratteri di domanda e risposta sono gia' "scritti" (ciclo di 16 secondi)
+  chatProgress() {
+    if (!this.chat) return [0, 0];
+    const t = this.chatT % 16;
+    const q = Math.floor(Math.max(0, Math.min(1, (t - 1) / 1.6)) * this.chat.q.length);
+    const total = this.chat.a.reduce((n, line) => n + line.length + 1, 0);
+    const a = Math.floor(Math.max(0, Math.min(1, (t - 3.6) / 4.5)) * total);
+    return [q, a];
+  }
+  drawChat(g, x, y, w, h) {
+    const [qn, an] = this.chatProgress();
+    g.fillStyle = "#0F1A26"; g.fillRect(x, y, w, h);
+    g.fillStyle = "rgba(157,176,191,.25)"; g.fillRect(x, y, 2, h);
+    g.fillStyle = "#FFB44A"; g.beginPath(); g.arc(x + 42, y + 46, 9, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#EEF1EC"; g.font = `700 30px ${FONT}`; g.fillText(this.chat.title, x + 64, y + 56);
+    let yy = y + 104;
+    if (qn) {
+      g.font = `500 26px ${FONT}`;
+      const lines = wrap(g, this.chat.q.slice(0, qn), w - 130);
+      const bh = lines.length * 36 + 26;
+      g.fillStyle = "rgba(255,180,74,.14)"; g.fillRect(x + 62, yy, w - 92, bh);
+      g.fillStyle = "#FFD9A3"; lines.forEach((l, i) => g.fillText(l, x + 80, yy + 38 + i * 36));
+      yy += bh;
+    }
+    yy += 58;
+    let left = an;
+    g.font = `500 25px ${FONT}`;
+    this.chat.a.forEach((line, i) => {
+      if (left <= 0) return;
+      g.fillStyle = i === 0 ? "#EEF1EC" : i === this.chat.a.length - 1 ? "#9DB0BF" : "#C9D4DC";
+      g.fillText(line.slice(0, left), x + 42, yy);
+      left -= line.length + 1; yy += i === 0 ? 50 : 40;
+    });
+  }
   update(dt) {
     this.blink += dt;
+    this.chatT += dt;
+    const key = this.chatProgress().join(",");
+    if (key !== this.chatKey) { this.chatKey = key; this.dirty = true; }
     const f = CODE_FILES[this.file];
     if (this.wait > 0) { this.wait -= dt; }
     else if (this.pos < f.text.length) {
@@ -401,7 +429,7 @@ export class CodeScreen {
     const typed = f.text.slice(0, this.pos);
     const lines = typed.split("\n");
     const first = Math.max(0, lines.length - this.rows);
-    g.font = `400 25px ui-monospace, "Cascadia Mono", Consolas, monospace`;
+    g.font = `400 21px ui-monospace, "Cascadia Mono", Consolas, monospace`;
     const cw = g.measureText("M").width;
     for (let r = first; r < lines.length; r++) {
       const y = this.top + (r - first) * this.lineH + 24;
@@ -415,6 +443,7 @@ export class CodeScreen {
         if (this.lastBlink % 2 === 0 || this.wait <= 0) { g.fillStyle = "#e8eef0"; g.fillRect(cx + 2, y - 22, cw * 0.9, 28); }
       }
     }
+    if (this.chat) this.drawChat(g, 968, 56, W - 968, H - 96);
     // barra di stato
     g.fillStyle = "#1c2733"; g.fillRect(0, H - 40, W, 40);
     g.fillStyle = "#aeb6bb"; g.font = `500 20px ui-monospace, Consolas, monospace`;
@@ -604,8 +633,9 @@ export function grilleTexture() {
 // --- frontale dell'oscilloscopio -----------------------------------------
 export function scopePanelTexture() {
   const W = 512, H = 360, c = canvas(W, H), g = c.getContext("2d");
-  g.fillStyle = "#c9c6bc"; g.fillRect(0, 0, W, H);
-  g.fillStyle = "#1C2733"; roundRect(g, 20, 20, 300, 230, 10); g.fill(); // cornice schermo
+  g.fillStyle = "#161D26"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#070B10"; roundRect(g, 20, 20, 300, 230, 10); g.fill(); // cornice schermo
+  g.fillStyle = "#C9D4DC";
   g.font = `600 20px ${FONT}`;
   try { g.fontStretch = "condensed"; } catch (e) { /* */ }
   [["Volts/div", 340, 52], ["Time/div", 430, 52], ["Pos", 340, 172], ["Trig", 430, 172]].forEach(([s, x, y]) => g.fillText(s, x, y));

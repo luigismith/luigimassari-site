@@ -1,11 +1,10 @@
-// Stanza: pareti, finestra sul Mar Piccolo con pioggia sul vetro, tende, poster ICHOS.
+// Stanza: pareti scure, vetrata panoramica sul Mar Piccolo con pioggia sul vetro, poster ICHOS.
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { plasterTextures, fabricTexture, posterTexture } from "./textures.js";
+import { plasterTextures, posterTexture } from "./textures.js";
 
 export const ROOM = {
   wallZ: -0.5, left: -1.6, right: 1.3, height: 2.7,
-  win: { x0: -0.8, x1: 0.8, y0: 1.05, y1: 2.25 },
+  win: { x0: -1.45, x1: 1.1, y0: 0.85, y1: 2.5 },
   glassZ: -0.6,
 };
 
@@ -273,39 +272,6 @@ export function createGlass() {
   return mesh;
 }
 
-// --- tende con leggera ondulazione da vertex shader ------------------------
-function curtain(x0, x1, y0, y1, z, mat, seed) {
-  const w = x1 - x0, h = y1 - y0;
-  const geo = new THREE.PlaneGeometry(w, h, 48, 24);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i);
-    const u = (x + w / 2) / w, v = (y + h / 2) / h; // v=1 in alto
-    const folds = Math.sin(u * Math.PI * 9 + seed) * 0.022 + Math.sin(u * Math.PI * 3.3 + seed * 2) * 0.012;
-    const gather = 1 - 0.22 * v;  // un po' raccolta in alto
-    pos.setX(i, x * gather);
-    pos.setZ(i, folds * (0.75 + 0.25 * v));
-  }
-  geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, mat);
-  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
-  return m;
-}
-
-function curtainMaterial(timeUniform) {
-  const mat = new THREE.MeshStandardMaterial({ map: fabricTexture(), roughness: 0.95, side: THREE.DoubleSide });
-  mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = timeUniform;
-    sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace(
-      "#include <begin_vertex>",
-      `#include <begin_vertex>
-      float sway = (1.0 - (position.y + 0.72) / 1.45);
-      transformed.z += sin(position.x * 14.0 + uTime * 0.7) * 0.006 * sway + sin(uTime * 0.31 + position.y * 2.0) * 0.004 * sway;`
-    );
-  };
-  return mat;
-}
-
 export function createRoom(ctx) {
   const { ui } = ctx;
   const group = new THREE.Group();
@@ -349,64 +315,48 @@ export function createRoom(ctx) {
   ceil.position.set((left + right) / 2, height, wallZ + 1.7);
   group.add(ceil);
 
-  // finestra: telaio in legno verniciato, montante centrale, traversi delle ante
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x847b6e, roughness: 0.6 });
+  // vetrata panoramica: telaio sottile in metallo nero, due montanti
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.35, metalness: 0.8 });
   const fz = ROOM.glassZ + 0.02;
   const W = win.x1 - win.x0, H = win.y1 - win.y0, cx = (win.x0 + win.x1) / 2, cy = (win.y0 + win.y1) / 2;
   const bar = (w, h, d, x, y, z) => {
-    const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.008), frameMat);
-    m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), frameMat);
+    m.position.set(x, y, z); m.castShadow = true;
     group.add(m);
   };
-  const ft = 0.075;
-  bar(W, ft, 0.07, cx, win.y1 - ft / 2, fz);
-  bar(W, ft, 0.07, cx, win.y0 + ft / 2, fz);
-  bar(ft, H, 0.07, win.x0 + ft / 2, cy, fz);
-  bar(ft, H, 0.07, win.x1 - ft / 2, cy, fz);
-  bar(0.09, H - ft * 2, 0.08, cx, cy, fz + 0.01);           // battuta centrale delle ante
-  bar(W / 2 - ft, 0.045, 0.05, cx - W / 4, win.y0 + 0.38, fz); // traversi
-  bar(W / 2 - ft, 0.045, 0.05, cx + W / 4, win.y0 + 0.38, fz);
-  // maniglia
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.11, 12), new THREE.MeshStandardMaterial({ color: 0x9a8f7c, metalness: 0.9, roughness: 0.35 }));
-  handle.position.set(cx + 0.03, cy - 0.05, fz + 0.06);
-  group.add(handle);
-
-  // davanzale in pietra
-  const sill = new THREE.Mesh(new RoundedBoxGeometry(W + 0.16, 0.035, 0.3, 2, 0.008), new THREE.MeshStandardMaterial({ color: 0x8f8a82, roughness: 0.42 }));
-  sill.position.set(cx, win.y0 - 0.015, wallZ - 0.08);
-  sill.receiveShadow = true; sill.castShadow = true;
+  const ft = 0.028;
+  bar(W, ft, 0.05, cx, win.y1 - ft / 2, fz);
+  bar(W, ft, 0.05, cx, win.y0 + ft / 2, fz);
+  bar(ft, H, 0.05, win.x0 + ft / 2, cy, fz);
+  bar(ft, H, 0.05, win.x1 - ft / 2, cy, fz);
+  for (const k of [1, 2]) bar(0.022, H - ft * 2, 0.045, win.x0 + (W * k) / 3, cy, fz);
+  // mensola sottile sotto la vetrata
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(W + 0.06, 0.018, 0.16), frameMat);
+  sill.position.set(cx, win.y0 - 0.009, wallZ - 0.03);
+  sill.receiveShadow = true;
   group.add(sill);
 
   // vetro
   const glass = createGlass();
   group.add(glass);
 
-  // tende e bastone
-  const curtainTime = { value: 0 };
-  const cMat = curtainMaterial(curtainTime);
-  const cl = curtain(win.x0 - 0.52, win.x0 + 0.06, 0.95, 2.42, wallZ + 0.06, cMat, 0.4);
-  const cr = curtain(win.x1 - 0.06, win.x1 + 0.45, 0.95, 2.42, wallZ + 0.06, cMat, 2.1);
-  for (const c of [cl, cr]) { c.castShadow = true; c.receiveShadow = true; c.userData.dynamic = true; group.add(c); }
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, W + 1.15, 16), new THREE.MeshStandardMaterial({ color: 0x2a221b, metalness: 0.6, roughness: 0.4 }));
-  rod.rotation.z = Math.PI / 2;
-  rod.position.set(cx - 0.03, 2.44, wallZ + 0.07);
-  group.add(rod);
+  // filo di luce ambra sopra la vetrata
+  const cove = new THREE.Mesh(new THREE.BoxGeometry(W, 0.006, 0.006), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.3, 0.45) }));
+  cove.position.set(cx, win.y1 + 0.03, wallZ + 0.004);
+  group.add(cove);
 
   // poster ICHOS sulla parete destra
   const pw = 0.52, ph = pw * 1088 / 768;
   const poster = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ map: posterTexture(ui), roughness: 0.82 }));
   poster.rotation.y = -Math.PI / 2;
   poster.position.set(right - 0.004, 1.62, -0.05);
-  poster.rotation.z = 0.012;
   poster.receiveShadow = true;
   group.add(poster);
-  // nastro adesivo agli angoli
-  const tapeMat = new THREE.MeshStandardMaterial({ color: 0xd9cfb5, roughness: 0.7, transparent: true, opacity: 0.8 });
-  for (const [dz, dy, rot] of [[-pw / 2, ph / 2, 0.6], [pw / 2, ph / 2, -0.5]]) {
-    const tp = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.022), tapeMat);
-    tp.rotation.y = -Math.PI / 2; tp.rotation.x = rot;
-    tp.position.set(right - 0.006, 1.62 + dy - 0.005, -0.05 + dz * 0.96);
-    group.add(tp);
+  // cornice sottile in metallo
+  for (const [dy, dz, h2, w2] of [[ph / 2, 0, 0.012, pw + 0.024], [-ph / 2, 0, 0.012, pw + 0.024], [0, -pw / 2, ph, 0.012], [0, pw / 2, ph, 0.012]]) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.012, h2, w2), frameMat);
+    f.position.set(right - 0.008, 1.62 + dy, -0.05 + dz);
+    group.add(f);
   }
 
   // luce fredda dalla finestra
@@ -427,7 +377,6 @@ export function createRoom(ctx) {
     poster,
     update(t) {
       glass.material.uniforms.uTime.value = t;
-      curtainTime.value = t;
     },
   };
 }
