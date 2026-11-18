@@ -3,7 +3,6 @@ import * as THREE from "three";
 
 export const INK = "#1C2733", GRAF = "#2B3440", SILK = "#E9ECE6", RED = "#C8261B", AMB = "#F2A33A";
 const FONT = '"Archivo Variable", Archivo, system-ui, sans-serif';
-const HAND = 'Caveat, "Segoe Print", cursive';
 
 let maxAniso = 4;
 export function setAnisotropy(n) { maxAniso = n; }
@@ -225,7 +224,7 @@ export function noiseRoughness(seed = 5, base = 140, spread = 50) {
   return tex(c, { srgb: false, repeat: [2, 2] });
 }
 
-export { FONT, HAND };
+export { FONT };
 
 // --- schermo del monitor: codice che si scrive da solo ----------------------
 const CODE_FILES = [
@@ -301,7 +300,7 @@ def promemoria(contratti):
     text: `// preventivo.ts — prezzo fisso, concordato prima di iniziare
 type Voce = { descrizione: string; giorni: number };
 
-const TARIFFA_GIORNO = 0; // la tariffa la decidiamo insieme
+const TARIFFA_GIORNO = 0; // la tariffa e' quella della proposta firmata
 
 export function totale(voci: Voce[]): number {
   // niente sorprese: si somma solo quello che e' scritto
@@ -437,45 +436,52 @@ function wrap(g, text, maxW) {
   return lines;
 }
 
-export function notepadTexture(about) {
-  const W = 768, H = 1088, c = canvas(W, H), g = c.getContext("2d"), r = rng(41);
-  g.fillStyle = "#F4E27A"; g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(140,110,20,${r() * 0.05})`; g.fillRect(r() * W, r() * H, 2, 2); }
-  // testata gommata
-  g.fillStyle = "#7A2A1E"; g.fillRect(0, 0, W, 64);
-  g.fillStyle = "rgba(0,0,0,.15)"; g.fillRect(0, 64, W, 4);
-  const top = 150, step = 42;
-  g.strokeStyle = "rgba(70,110,170,.45)"; g.lineWidth = 2;
-  for (let y = top; y < H - 20; y += step) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-  g.strokeStyle = "rgba(200,60,50,.55)"; g.beginPath(); g.moveTo(96, 64); g.lineTo(96, H); g.stroke();
-  g.beginPath(); g.moveTo(102, 64); g.lineTo(102, H); g.stroke();
-
-  const ink = "#1f2c6b";
-  let line = 0;
-  const put = (text, { size = 38, weight = 400, x = 116, color = ink } = {}) => {
-    g.save();
-    g.fillStyle = color;
-    g.font = `${weight} ${size}px ${HAND}`;
-    g.translate(x, top + line * step - 8);
-    g.rotate((r() - 0.5) * 0.012);
-    g.fillText(text, 0, 0);
-    g.restore();
-    line++;
-  };
-  put(about.notepad_h, { size: 54, weight: 600 });
-  g.strokeStyle = RED; g.lineWidth = 3;
-  g.beginPath(); g.moveTo(116, top + 4); g.quadraticCurveTo(220, top + 10, 330, top + 2); g.stroke();
-  line += 0.4;
-  for (const item of about.notepad) {
-    g.font = `600 38px ${HAND}`;
-    wrap(g, item, 580).forEach((l, i) => put((i === 0 ? "– " : "   ") + l, { size: 38, weight: 600, x: 120 }));
-    line += 0.35;
+export function tabletTexture(about) {
+  const W = 768, H = 1088, c = canvas(W, H), g = c.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0B1826"); bg.addColorStop(1, "#07101A");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  // griglia tecnica
+  g.strokeStyle = "rgba(255,180,74,0.07)"; g.lineWidth = 1;
+  for (let x = 0; x <= W; x += 32) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); }
+  for (let y = 0; y <= H; y += 32) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); }
+  // barra in alto
+  g.fillStyle = "rgba(255,180,74,0.08)"; g.fillRect(0, 0, W, 72);
+  g.fillStyle = "#FFB44A"; g.font = `700 24px ${FONT}`;
+  g.fillText("Luigi Massari", 40, 47);
+  g.textAlign = "right"; g.fillStyle = "#9DB0BF"; g.font = `500 22px ${FONT}`; g.fillText("Taranto", W - 40, 47); g.textAlign = "left";
+  g.fillStyle = "#FFB44A"; g.fillRect(0, 72, W, 2);
+  // titolo
+  g.fillStyle = "#FFFFFF"; g.font = `800 58px ${FONT}`;
+  try { g.fontStretch = "expanded"; } catch (e) { /* */ }
+  g.fillText(about.notepad_h, 40, 170);
+  try { g.fontStretch = "normal"; } catch (e) { /* */ }
+  g.fillStyle = "#FF5A3D"; g.fillRect(40, 192, 96, 4);
+  // elenco dei lavori in corso, come un pannello di stato
+  const colors = ["#FFB44A", "#FFB44A", "#9DB0BF", "#FF5A3D", "#FFB44A", "#9DB0BF"];
+  let y = 270;
+  about.notepad.forEach((item, i) => {
+    const [name, state] = item.split(" — ");
+    g.fillStyle = "rgba(255,255,255,0.03)"; g.fillRect(40, y - 44, W - 80, 104);
+    g.strokeStyle = "rgba(150,180,210,0.18)"; g.strokeRect(40.5, y - 43.5, W - 81, 103);
+    g.fillStyle = colors[i % colors.length];
+    g.shadowColor = colors[i % colors.length]; g.shadowBlur = 14;
+    g.beginPath(); g.arc(76, y + 8, 9, 0, Math.PI * 2); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = "#E6EBF0"; g.font = `700 34px ${FONT}`;
+    g.fillText(name, 108, y + 2);
+    if (state) { g.fillStyle = "#9DB0BF"; g.font = `500 24px ${FONT}`; g.fillText(state.charAt(0).toUpperCase() + state.slice(1), 108, y + 40); }
+    y += 124;
+  });
+  // traccia in basso
+  g.strokeStyle = "#FFB44A"; g.lineWidth = 2.5; g.shadowColor = "#FFB44A"; g.shadowBlur = 10;
+  g.beginPath();
+  for (let x = 40; x <= W - 40; x += 4) {
+    const t = (x - 40) / (W - 80);
+    const yy = H - 70 + Math.sin(t * Math.PI * 9) * 18 * Math.sin(t * Math.PI) + Math.sin(t * 61) * 3;
+    x === 40 ? g.moveTo(x, yy) : g.lineTo(x, yy);
   }
-  // un piccolo schizzo: onda con freccia
-  g.strokeStyle = ink; g.lineWidth = 2.5; g.beginPath();
-  const sy = top + Math.min(line + 0.6, 22) * step;
-  for (let x = 0; x < 200; x += 4) { const y = sy + Math.sin(x * 0.08) * 12 * Math.exp(-x / 160); x ? g.lineTo(560 + x * 0.8, y) : g.moveTo(560, y); }
-  g.stroke();
+  g.stroke(); g.shadowBlur = 0;
   return tex(c);
 }
 
@@ -554,9 +560,9 @@ export function recorderTopTexture(label) {
   g.fillStyle = "#2a2d31"; roundRect(g, wx, wy, ww, wh, 10); g.fill();
   g.fillStyle = "#EDE6CF"; roundRect(g, wx + 30, wy + 26, ww - 60, wh - 150, 6); g.fill();
   g.fillStyle = RED; g.fillRect(wx + 30, wy + 26, ww - 60, 22);
-  g.fillStyle = "#1f2c6b"; g.font = `600 50px ${HAND}`; g.textAlign = "center";
+  g.fillStyle = "#1C2733"; g.font = `800 46px ${FONT}`; g.textAlign = "center";
   g.fillText(label, wx + ww / 2, wy + 112);
-  g.font = `400 30px ${HAND}`; g.fillText("A  ·  60 min", wx + ww / 2, wy + 150);
+  g.font = `500 26px ui-monospace, Consolas, monospace`; g.fillText("A  ·  60 MIN", wx + ww / 2, wy + 150);
   // finestrella del nastro
   g.fillStyle = "#0b0c0e"; roundRect(g, wx + 150, wy + 172, ww - 300, 70, 30); g.fill();
   g.fillStyle = "#4a2f20"; g.fillRect(wx + 190, wy + 190, ww - 380, 34);

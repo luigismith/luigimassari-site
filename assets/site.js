@@ -2,22 +2,49 @@
 (function () {
   "use strict";
 
-  // Menu mobile
-  var toggle = document.querySelector(".menu-toggle");
-  var nav = document.getElementById("nav");
-  if (toggle && nav) {
-    toggle.addEventListener("click", function () {
-      var open = nav.classList.toggle("open");
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  // Navigazione "sintonia": l'ago va sulla stazione corrente, o su quella sotto il puntatore o il focus
+  function initTuner(nav) {
+    var needle = nav.querySelector(".tuner-needle");
+    var links = Array.prototype.slice.call(nav.querySelectorAll("a"));
+    if (!needle || !links.length) return;
+    var spy = null; // sezione in vista (solo nella home classica)
+    function current() {
+      return nav.querySelector("a[aria-current]") || (spy ? nav.querySelector('a[data-station="' + spy + '"]') : null);
+    }
+    function moveTo(a) {
+      if (!a || !a.offsetParent) { nav.classList.remove("is-tuned"); return; }
+      needle.style.transform = "translateX(" + (a.offsetLeft + a.offsetWidth / 2) + "px)";
+      nav.classList.add("is-tuned");
+    }
+    function rest() { moveTo(current()); }
+    links.forEach(function (a) {
+      a.addEventListener("mouseenter", function () { moveTo(a); });
+      a.addEventListener("focus", function () { moveTo(a); });
     });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && nav.classList.contains("open")) {
-        nav.classList.remove("open");
-        toggle.setAttribute("aria-expanded", "false");
-        toggle.focus();
-      }
+    nav.addEventListener("mouseleave", rest);
+    nav.addEventListener("focusout", function () {
+      setTimeout(function () { if (!nav.contains(document.activeElement)) rest(); }, 0);
     });
+    window.addEventListener("resize", rest);
+    if ("ResizeObserver" in window) new ResizeObserver(rest).observe(nav); // es. compare la barra di scorrimento
+    new MutationObserver(rest).observe(nav, { attributes: true, subtree: true, attributeFilter: ["aria-current"] });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(rest);
+    var sections = document.querySelectorAll("main [data-station]");
+    if (sections.length && "IntersectionObserver" in window && !nav.classList.contains("scene-nav")) {
+      var visible = {};
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { visible[e.target.dataset.station] = e.isIntersecting; });
+        spy = null;
+        Array.prototype.forEach.call(sections, function (sec) { if (!spy && visible[sec.dataset.station]) spy = sec.dataset.station; });
+        if (!nav.matches(":hover") && !nav.contains(document.activeElement)) rest();
+      }, { rootMargin: "-35% 0px -55% 0px" });
+      Array.prototype.forEach.call(sections, function (sec) { io.observe(sec); });
+    }
+    rest();
+    var cur = current();
+    if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
   }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tuner]"), initTuner);
 
   // Modulo contatti: compone una mail
   var form = document.querySelector(".contact-form");

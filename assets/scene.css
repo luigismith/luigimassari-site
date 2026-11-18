@@ -1,23 +1,4 @@
 /* Home 3D "Il banco" — interfaccia HTML sopra la scena. Token da DESIGN.md */
-/* Caveat (OFL): scrittura a mano sul bloc-notes. Si scarica solo quando la scena la chiede. */
-@font-face {
-  font-family: "Caveat"; font-style: normal; font-display: swap; font-weight: 400;
-  src: url(fonts/caveat-latin-400-normal.woff2) format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Caveat"; font-style: normal; font-display: swap; font-weight: 400;
-  src: url(fonts/caveat-latin-ext-400-normal.woff2) format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "Caveat"; font-style: normal; font-display: swap; font-weight: 600;
-  src: url(fonts/caveat-latin-600-normal.woff2) format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-.btn-3d .led { margin-right: 2px; }
-.btn-3d[hidden] { display: none; }
-
 html.scene-mode, html.scene-mode body { overflow: hidden; height: 100%; }
 html.scene-mode body > .skip,
 html.scene-mode body > .site-header,
@@ -213,3 +194,66 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .scene-canvas canvas, .scene-panel, .scene-intro, .scene-progress span { transition: none; }
 }
+
+/* ===========================================================================
+   Identità "Sintonia" sopra la scena (vedi DESIGN.md): stessi colori e stessa
+   navigazione del sito classico.
+   =========================================================================== */
+.scene { background: #050B12; }
+.scene-bar { gap: var(--s6); background: linear-gradient(to bottom, rgba(5, 11, 18, .86), rgba(5, 11, 18, 0)); }
+.scene-bar .tuner { max-width: 640px; }
+.scene-bar .lang { background: rgba(10, 22, 34, .6); }
+.scene :focus-visible { outline: 2px solid var(--sodio); outline-offset: 3px; }
+.scene-panel h2:focus, .scene-panel h2:focus-visible, .sp-card h3:focus, .sp-card h3:focus-visible { outline: none; }
+
+/* etichette sempre visibili sugli oggetti: sono link, si usano anche da tastiera */
+.scene-tags { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s ease; }
+.scene-tags.on { opacity: 1; }
+.scene-tag {
+  --lead: 30px;
+  position: absolute; left: 0; top: 0; margin-top: calc(var(--lead) * -1);
+  padding: 6px 12px 7px; white-space: nowrap; text-decoration: none;
+  background: rgba(10, 22, 34, .93); color: var(--serigrafia);
+  border: 1px solid rgba(238, 241, 236, .3); border-radius: 2px;
+  font-size: 14.5px; font-weight: 650;
+}
+.scene-tags.on .scene-tag { pointer-events: auto; }
+.scene-tag::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: var(--lead); background: rgba(238, 241, 236, .55); }
+.scene-tag::before { content: ""; position: absolute; left: 50%; top: calc(100% + var(--lead)); width: 7px; height: 7px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--sodio); box-shadow: 0 0 8px var(--sodio); }
+.scene-tag:hover, .scene-tag:focus-visible { color: var(--sodio); border-color: var(--sodio); }
+
+.scene-label { background: rgba(10, 22, 34, .93); border-radius: 2px; }
+.scene-label .dot { background: var(--sodio); box-shadow: 0 0 8px var(--sodio); }
+
+/* pannello di lettura: superficie opaca, un filetto, niente decorazioni */
+.scene-panel {
+  width: min(480px, 42vw);
+  background: rgba(10, 22, 34, .95); color: var(--serigrafia);
+  border: 1px solid rgba(157, 176, 191, .28); border-radius: 4px;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .9);
+}
+.scene-panel :focus-visible { outline: 2px solid var(--sodio); outline-offset: 3px; }
+.scene-panel h2 { color: var(--serigrafia); font-stretch: 122%; }
+.scene-panel h3 { color: var(--serigrafia); }
+.scene-panel p { color: var(--foschia); }
+.scene-panel .lead { color: #DDE5EA; }
+.scene-panel .kicker, .sp-section > h3.sp-h { font-size: 14px; font-weight: 650; font-stretch: 88%; color: var(--foschia); }
+.scene-back { background: transparent; color: var(--serigrafia); border: 1px solid rgba(157, 176, 191, .35); border-radius: 2px; }
+.scene-back:hover { color: var(--sodio); border-color: var(--sodio); }
+.sp-list, .sp-list li, .sp-doors, .sp-doors a, .sp-products, .sp-products button { border-color: rgba(157, 176, 191, .22); }
+.sp-doors a, .sp-products button { color: var(--serigrafia); }
+.sp-doors a:hover, .sp-products button:hover, .sp-products button[aria-current="true"] { background: rgba(255, 180, 74, .08); }
+.sp-doors a:hover .dh { color: var(--sodio); }
+.sp-doors .dp { color: var(--foschia); }
+.sp-steps li { border-top-color: var(--serigrafia); }
+.sp-steps .n { border-color: var(--serigrafia); color: var(--serigrafia); }
+.sp-steps li:first-child .n { background: var(--sodio); border-color: var(--sodio); color: #14100A; }
+.sp-link { color: var(--serigrafia); }
+.sp-link:hover { color: var(--sodio); }
+.sp-card { background: var(--fondale); border: 1px solid rgba(157, 176, 191, .28); border-radius: 4px; }
+.sp-card .price { color: var(--serigrafia); }
+.scene-ctl { border-radius: 2px; background: rgba(10, 22, 34, .88); }
+.scene-ctl[aria-pressed="true"] .scene-ctl-led { background: var(--sodio); box-shadow: 0 0 8px var(--sodio); }
+.scene-progress span { background: var(--sodio); box-shadow: 0 0 10px var(--sodio); }
+.scene-sound-choice button { border-radius: 2px; }
+.scene-sound-choice button[aria-pressed="true"] { background: var(--sodio); color: #14100A; border-color: var(--sodio); }

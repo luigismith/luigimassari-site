@@ -16,10 +16,10 @@
 <meta property="og:image" content="https://luigimassari.com/assets/og.png">
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#F1F2EE">
+<meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=202611181220">
+<link rel="stylesheet" href="/assets/site.css?v=202611181308">
 
 
 
@@ -29,14 +29,17 @@
 <header class="site-header">
   <div class="wrap header-inner">
     <a class="wordmark" href="/en/" aria-label="Luigi Massari, home"><span class="led" aria-hidden="true"></span>Luigi Massari</a>
-    <button class="menu-toggle" aria-expanded="false" aria-controls="nav">Menu</button>
-    <nav id="nav" class="nav" aria-label="Principale">
-      <a href="/en/development/">Development</a>
-      <a href="/en/elettrofoni/">Elettrofoni</a>
-      <a href="/en/#chi-sono">About</a>
-      <a href="/en/contact/" aria-current="page">Contact</a>
-      <a class="lang" href="/contatti/" hreflang="it" lang="it">Italiano</a>
+    <nav id="nav" class="tuner" aria-label="Site sections" data-tuner>
+      <ul>
+        <li><a href="/en/consulting/" data-station="dev">IT and AI consulting</a></li>
+        <li><a href="/en/elettrofoni/" data-station="shop">Elettrofoni</a></li>
+        <li><a href="/en/#training" data-station="lab">Training</a></li>
+        <li><a href="/en/#profile" data-station="about">Profile</a></li>
+        <li><a href="/en/contact/" data-station="contact" aria-current="page">Contact</a></li>
+      </ul>
+      <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
+    <a class="lang" href="/contatti/" hreflang="it" lang="it">Italiano</a>
   </div>
 </header>
 <main id="main">
@@ -44,17 +47,17 @@
 <section class="page-head">
   <div class="wrap contact-grid">
     <div>
-      <h1 class="display display-md">Get in touch</h1>
-      <p class="lede">I reply within two working days.</p>
+      <h1 class="display display-md">Contact</h1>
+      <p class="lede">Reply within two working days. For a quote, include what you need, your timeline and, if possible, an indicative budget.</p>
       <h2 class="h3 contact-direct">Or write directly</h2>
       <p><a class="big-link" href="mailto:info@luigimassari.com">info@luigimassari.com</a></p>
       
     </div>
-    <form class="contact-form" data-mailto="info@luigimassari.com" data-err-required="Please fill in name, email and message." data-err-email="Check the email address: something&#39;s missing." novalidate>
+    <form class="contact-form" data-mailto="info@luigimassari.com" data-err-required="Please fill in name, email and message." data-err-email="The email address doesn&#39;t look valid." novalidate>
       <div class="field"><label for="f-name">Name</label><input id="f-name" name="name" autocomplete="name" required></div>
       <div class="field"><label for="f-email">Your email</label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
       <div class="field"><label for="f-topic">Topic</label>
-        <select id="f-topic" name="topic"><option selected>Website</option><option>Web app or business software</option><option>Automation and AI</option><option>Infrastructure and security</option><option>Elettrofoni</option><option>Other</option></select></div>
+        <select id="f-topic" name="topic"><option selected>AI consulting and automation</option><option>IT consulting and security</option><option>Web app or business software</option><option>Website</option><option>Elettrofoni</option><option>Training</option><option>Other</option></select></div>
       <div class="field"><label for="f-msg">Message</label><textarea id="f-msg" name="message" rows="6" placeholder="What you need, by when, and any useful links." required></textarea></div>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary" type="submit">Prepare the email</button>
@@ -68,7 +71,7 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">Custom software and handmade electronic instruments, from Taranto, Italy.</p>
+      <p class="muted">IT and AI consulting, custom software and handmade electronic instruments, from Taranto, Italy.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
@@ -83,6 +86,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181220" defer></script>
+<script src="/assets/site.js?v=202611181308" defer></script>
 </body>
 </html>

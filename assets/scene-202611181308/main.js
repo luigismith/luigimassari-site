@@ -24,7 +24,7 @@ export const VIEWS = {
   lab: { pos: V(0.25, 1.5, 0.05), target: V(1.3, 1.6, -0.05), fov: 42 },
 };
 
-// vignettatura, leggera aberrazione cromatica ai bordi e grana, dopo l'OutputPass (spazio sRGB)
+// vignettatura e grana leggere, dopo l'OutputPass (spazio sRGB)
 const FinishShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAspect: { value: 1.6 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
@@ -33,13 +33,10 @@ const FinishShader = {
     float h(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     void main(){
       vec2 d = vUv - 0.5;
-      vec2 off = d * dot(d, d) * 0.007;
       vec4 c = texture2D(tDiffuse, vUv);
-      c.r = texture2D(tDiffuse, vUv + off).r;
-      c.b = texture2D(tDiffuse, vUv - off).b;
       vec2 q = d * vec2(uAspect, 1.0);
       c.rgb *= mix(0.5, 1.0, smoothstep(1.05, 0.25, length(q)));
-      c.rgb += (h(gl_FragCoord.xy + fract(uTime * 7.3) * 431.0) - 0.5) * 0.032;
+      c.rgb += (h(gl_FragCoord.xy + fract(uTime * 7.3) * 431.0) - 0.5) * 0.022;
       gl_FragColor = c;
     }`,
 };
@@ -81,8 +78,6 @@ export async function start({ data, root, force, toLofi }) {
   await Promise.all([
     document.fonts.load('800 60px "Archivo Variable"'),
     document.fonts.load('600 30px "Archivo Variable"'),
-    document.fonts.load("400 40px Caveat"),
-    document.fonts.load("600 40px Caveat"),
   ]).catch(() => {});
   ui.progress(0.38);
   await nextFrame();
@@ -157,6 +152,38 @@ export async function start({ data, root, force, toLofi }) {
   addHit(objects.sections.contact, "contact");
   addHit(room.poster, "lab");
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
+
+  // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
+  const tagLayer = root.querySelector("[data-scene-tags]");
+  const tags = [];
+  tagLayer.inert = true;
+  function addTag(view, point, lead) {
+    const a = document.createElement("a");
+    a.className = "scene-tag";
+    a.href = "#" + data.hash[view];
+    a.textContent = data.ui.labels[view];
+    a.style.setProperty("--lead", lead + "px");
+    tagLayer.appendChild(a);
+    tags.push({ a, point });
+  }
+  const hitOf = (view) => hits.filter((m) => m.userData.view === view);
+  addTag("dev", hitOf("dev")[0].userData.top, 26);
+  const synthTops = hitOf("shop").map((m) => m.userData.top);
+  addTag("shop", synthTops.reduce((acc, p) => acc.add(p), V(0, 0, 0)).multiplyScalar(1 / synthTops.length).setY(Math.max(...synthTops.map((p) => p.y))), 44);
+  addTag("about", hitOf("about")[0].userData.top, 34);
+  addTag("contact", hitOf("contact")[0].userData.top, 22);
+  addTag("lab", hitOf("lab")[0].position.clone().add(V(0, -0.2, 0)), 0); // a meta' poster: non copre il selettore della lingua
+  const tagPos = new THREE.Vector3();
+  function updateTags() {
+    const on = state.entered && state.view === "overview" && !rig.moving;
+    if (tagLayer.classList.contains("on") !== on) { tagLayer.classList.toggle("on", on); tagLayer.inert = !on; }
+    if (!on) return;
+    for (const t of tags) {
+      tagPos.copy(t.point).project(camera);
+      const x = (tagPos.x + 1) / 2 * size.x, y = (1 - tagPos.y) / 2 * size.y;
+      t.a.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    }
+  }
 
   // --- stato e navigazione con hash ---
   const state = { view: "overview", entered: false, hover: null, nav: 0 };
@@ -262,8 +289,7 @@ export async function start({ data, root, force, toLofi }) {
     tmp.copy(top).project(camera);
     const x = (tmp.x + 1) / 2 * size.x, y = (1 - tmp.y) / 2 * size.y;
     if (slug && state.view === "shop") ui.showLabel(x, y, products[slug].name, products[slug].status_label);
-    else if (view === state.view) ui.hideLabel();
-    else ui.showLabel(x, y, data.ui.labels[view]);
+    else ui.hideLabel(); // nella vista d'insieme ci sono gia' le etichette fisse
   }
 
   resize();
@@ -284,6 +310,7 @@ export async function start({ data, root, force, toLofi }) {
     objects.update(t, dt, frameCtx);
     rig.update(dt);
     updateHover();
+    updateTags();
     finish.uniforms.uTime.value = t;
     composer.render(dt);
     fps.frames++; fps.acc += dt;

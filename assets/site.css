@@ -191,6 +191,15 @@ a:hover { color: var(--segnale); }
 .seq-clear:hover { border-color: var(--serigrafia-2); opacity: 1; }
 .seq-hint { font-size: 15px; margin-top: var(--s4); max-width: 52ch; }
 
+/* Lavori recenti nell'apertura della home */
+.hero-proof { border-top: 1.5px solid var(--fg); padding-top: var(--s4); }
+.hero-proof .work-list li:first-child { border-top: 0; padding-top: var(--s3); }
+.hero-proof .work-list p { font-size: 15.5px; }
+/* Sequencer nella pagina Elettrofoni */
+.shop-seq { border-top: 1px solid var(--rule); }
+.seq-wrap { max-width: calc(720px + var(--gutter) * 2); }
+.seq-wrap .seq-hint { color: var(--muted); }
+
 /* Le due porte */
 .doors { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--rule); }
 .door { padding: var(--s9) 0; }
@@ -347,4 +356,163 @@ a:hover { color: var(--segnale); }
   .product-grid { grid-template-columns: 1fr; }
   .process { grid-template-columns: 1fr; }
   .specs div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* ===========================================================================
+   Identità "Sintonia" (2026-11-18). Vedi DESIGN.md.
+   Palette presa dalla scena: la notte sul Mar Piccolo. L'ambra è la luce e l'azione,
+   il rosso segnala solo uno stato (LED, errore). Un solo font: Archivo Variable.
+   =========================================================================== */
+:root, .theme-dark {
+  --notte: #0A1622;       /* fondo: blu inchiostro, non nero */
+  --fondale: #0F2031;     /* superfici rialzate */
+  --serigrafia: #EEF1EC;  /* testo */
+  --foschia: #9DB0BF;     /* testo secondario (8:1 su notte) */
+  --sodio: #FFB44A;       /* luce: ago della sintonia, azioni, link attivi */
+  --segnale: #FF5A3D;     /* solo stati: LED, errori */
+  --bg: var(--notte);
+  --fg: var(--serigrafia);
+  --muted: var(--foschia);
+  --rule: rgba(157, 176, 191, .22);
+  --surface: var(--fondale);
+}
+html, body { background: var(--notte); color: var(--fg); }
+a:hover, .theme-dark a:hover { color: var(--sodio); }
+:focus-visible, .theme-dark :focus-visible { outline: 2px solid var(--sodio); outline-offset: 3px; border-radius: 0; }
+::selection { background: var(--sodio); color: var(--notte); }
+.muted { color: var(--muted); }
+
+/* Tipografia: larghezza 125% solo sui titoli brevi, testo e navigazione al 100% */
+.display { font-size: clamp(44px, 6.4vw, 104px); font-weight: 800; font-stretch: 125%; line-height: .98; letter-spacing: -0.03em; max-width: 12ch; }
+.display-md { font-size: clamp(36px, 4.6vw, 64px); line-height: 1.04; max-width: 20ch; }
+.display-shop { font-size: clamp(56px, 11vw, 150px); max-width: none; }
+.h2 { font-size: clamp(30px, 3.4vw, 46px); font-weight: 800; font-stretch: 118%; letter-spacing: -0.015em; line-height: 1.06; }
+.h3 { font-size: 20px; font-weight: 700; font-stretch: 104%; }
+.lede { color: var(--muted); max-width: 56ch; }
+.label { font-size: 15px; font-weight: 650; font-stretch: 88%; color: var(--muted); margin: 0 0 var(--s4); }
+.prose { max-width: 62ch; font-size: 18px; }
+
+/* Pulsanti */
+.btn { border-radius: 2px; min-height: 50px; font-stretch: 104%; }
+.btn-primary { background: var(--sodio); color: #14100A; }
+.btn-primary:hover { background: #FFC878; color: #14100A; }
+.btn-secondary, .btn-light { border: 1.5px solid rgba(238, 241, 236, .5); color: var(--fg); background: transparent; }
+.btn-secondary:hover, .btn-light:hover { border-color: var(--sodio); color: var(--sodio); background: transparent; }
+.btn-3d[hidden] { display: none; }
+
+/* Intestazione */
+.site-header { position: sticky; top: 0; z-index: 20; background: rgba(10, 22, 34, .88); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+.header-inner { display: flex; align-items: center; justify-content: flex-start; gap: var(--s6); min-height: 76px; }
+.wordmark { flex: none; color: var(--fg); }
+.led { background: var(--segnale); box-shadow: 0 0 0 3px rgba(255, 90, 61, .2), 0 0 10px rgba(255, 90, 61, .7); }
+.lang { flex: none; font-size: 14px; font-weight: 600; font-stretch: 88%; text-decoration: none; color: var(--muted); border: 1px solid var(--rule); padding: 5px 10px; border-radius: 2px; }
+.lang:hover { color: var(--sodio); border-color: var(--sodio); }
+
+/* Navigazione "sintonia": le sezioni sono stazioni su una scala, un ago di luce indica quella corrente.
+   Sono link normali: la voce corrente è anche in grassetto e sottolineata (non dipende da colore o movimento). */
+.tuner { position: relative; flex: 1 1 auto; max-width: 700px; margin-left: auto; }
+.tuner ul {
+  display: flex; justify-content: space-between; gap: 2px; list-style: none; margin: 0; padding: 15px 0 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(238, 241, 236, .5) 0 1px, transparent 1px 48px) 0 0 / 100% 11px no-repeat,
+    repeating-linear-gradient(90deg, rgba(238, 241, 236, .24) 0 1px, transparent 1px 8px) 0 0 / 100% 6px no-repeat;
+}
+.tuner a { display: block; padding: 8px 10px 11px; text-decoration: none; color: var(--fg); font-size: 15.5px; font-weight: 600; white-space: nowrap; }
+.tuner a:hover { color: var(--sodio); }
+.tuner a[aria-current] { color: var(--sodio); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.tuner-needle {
+  position: absolute; left: 0; top: -5px; width: 2px; height: 27px; margin-left: -1px;
+  background: var(--sodio); box-shadow: 0 0 10px 1px rgba(255, 180, 74, .8);
+  opacity: 0; pointer-events: none;
+  transition: transform .5s cubic-bezier(.3, 1.35, .5, 1), opacity .2s ease;
+}
+.tuner.is-tuned .tuner-needle { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .tuner-needle { transition: none; } }
+
+/* Apertura: il banco di notte */
+.hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: flex-end; min-height: min(80vh, 780px); padding: 0; border-bottom: 1px solid var(--rule); }
+.hero-media { position: absolute; inset: 0; z-index: -1; }
+.hero-media img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 64% 42%; }
+.hero-media::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, rgba(10, 22, 34, .96) 0%, rgba(10, 22, 34, .8) 34%, rgba(10, 22, 34, .12) 66%, rgba(10, 22, 34, 0) 100%),
+    linear-gradient(0deg, rgba(10, 22, 34, .85) 0%, rgba(10, 22, 34, 0) 30%);
+}
+.hero-inner { padding-top: var(--s9); padding-bottom: var(--s8); }
+.hero .lede { color: #C9D4DC; max-width: 50ch; font-size: clamp(18px, 1.5vw, 21px); }
+
+/* Sezioni */
+.section { padding: var(--section) 0; }
+.section-alt, .shop-info { background: var(--fondale); }
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s8); align-items: start; }
+.split-head .h2 { margin-bottom: var(--s4); }
+.split-head .lede { margin-top: 0; }
+.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--fg); }
+.rows li { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--s5); padding: var(--s5) 0; border-bottom: 1px solid var(--rule); }
+.rows .h3 { margin: 0; }
+.rows p { margin: 0; color: var(--muted); font-size: 16px; }
+.cases { margin-top: var(--s8); }
+.case-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s6); }
+.case-grid li { border-top: 2px solid var(--sodio); padding-top: var(--s4); }
+.case-grid p { color: var(--muted); font-size: 16px; }
+
+/* Fascia Elettrofoni: i frontali degli strumenti */
+.band { background: linear-gradient(180deg, #0D1B29, #09121B); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.band-head { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s8); align-items: end; margin-bottom: var(--s7); }
+.band-head .h2, .band-head .lede { margin: 0; }
+.instruments { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s5); }
+.instruments a { display: block; text-decoration: none; color: var(--fg); }
+.instrument-art, .instrument-name { display: block; }
+.instrument-art svg { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 40px -28px #000; }
+.instrument-name { margin-top: var(--s4); font-weight: 800; font-stretch: 116%; font-size: 19px; }
+.instruments a:hover .instrument-name { color: var(--sodio); }
+.instruments .status { margin-top: 4px; color: var(--muted); }
+
+.projects { max-width: none; border-top: 1px solid var(--rule); }
+.projects a { color: var(--fg); }
+.projects a:hover { color: var(--sodio); }
+
+/* Fascia finale: l'unico grande campo di colore */
+.cta-band, .theme-dark .cta-band { background: var(--sodio); color: #14100A; padding: var(--s8) 0; }
+.cta-band .h2 { color: #14100A; }
+.cta-band p { color: #3D2C0E; }
+.cta-band .btn-primary { background: #14100A; color: var(--serigrafia); }
+.cta-band .btn-primary:hover { background: var(--notte); color: #fff; }
+.cta-band :focus-visible { outline-color: #14100A; }
+
+/* Pagine interne */
+.service-rows, .process li { border-top-color: var(--fg); }
+.process-n { border-color: var(--fg); }
+.process li:first-child .process-n { background: var(--sodio); border-color: var(--sodio); color: #14100A; }
+.stack, .contact-form { background: var(--fondale); border-radius: 4px; }
+.product-link:hover .h3 { color: var(--sodio); }
+.shop-seq { border-top: 1px solid var(--rule); }
+.field input, .field select, .field textarea { background: #F4F6F2; color: #14202B; border: 1.5px solid transparent; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--sodio); outline: 3px solid rgba(255, 180, 74, .45); }
+.form-error { color: #FF8A73; }
+.status-su-ordinazione::before, .status-preordine::before { background: var(--sodio); }
+.site-footer { background: #08111A; }
+
+@media (max-width: 980px) {
+  .split, .band-head { grid-template-columns: 1fr; gap: var(--s6); }
+  .rows li { grid-template-columns: 1fr; gap: var(--s2); }
+  .case-grid { grid-template-columns: 1fr; }
+  .instruments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  /* la scala di sintonia diventa una striscia che scorre, sempre visibile: niente menu da aprire */
+  .header-inner { flex-wrap: wrap; gap: 0 var(--s4); min-height: 0; padding-top: 12px; }
+  .wordmark { margin-right: auto; }
+  .tuner { order: 3; flex: 0 0 100%; max-width: none; margin: 8px calc(var(--gutter) * -1) 0; padding: 0 var(--gutter); overflow-x: auto; scrollbar-width: none; }
+  .tuner::-webkit-scrollbar { display: none; }
+  .tuner ul { width: max-content; min-width: 100%; gap: 8px; }
+  .tuner a { padding-left: 6px; padding-right: 6px; }
+}
+@media (max-width: 720px) {
+  .hero { display: block; min-height: 0; }
+  .hero-media { position: relative; height: 56vw; min-height: 200px; z-index: 0; }
+  .hero-media img { object-position: 60% 40%; }
+  .hero-media::after { background: linear-gradient(0deg, var(--notte) 0%, rgba(10, 22, 34, 0) 60%); }
+  .hero-inner { padding-top: var(--s4); padding-bottom: var(--s7); }
 }

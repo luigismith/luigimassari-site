@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
-  woodTextures, noiseRoughness, CodeScreen, notepadTexture, panelTextures, panelEmissive,
+  woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
   recorderTopTexture, grilleTexture, scopePanelTexture,
 } from "./textures.js";
 
@@ -345,7 +345,7 @@ function createMonitor(M) {
   kb.add(kbBase);
   const keyGeo = new RoundedBoxGeometry(0.0225, 0.008, 0.0215, 2, 0.003);
   // retroilluminazione appena accennata
-  const keys = new THREE.InstancedMesh(keyGeo, new THREE.MeshStandardMaterial({ color: 0x2f353c, roughness: 0.6, emissive: 0x0e5a6a, emissiveIntensity: 0.35 }), 4 * 14 + 1);
+  const keys = new THREE.InstancedMesh(keyGeo, new THREE.MeshStandardMaterial({ color: 0x2f353c, roughness: 0.6, emissive: 0x6a4a12, emissiveIntensity: 0.08 }), 4 * 14 + 1);
   const m4 = new THREE.Matrix4();
   let n = 0;
   for (let r = 0; r < 4; r++) for (let c = 0; c < 14; c++) {
@@ -366,38 +366,38 @@ function createMonitor(M) {
 }
 
 // ---------------------------------------------------------------------------
-// Bloc-notes giallo con penna
+// Tablet con il profilo e i lavori in corso (schermo che si illumina da solo)
 // ---------------------------------------------------------------------------
-function createNotepad(M, data) {
+function createTablet(M, data) {
   const g = new THREE.Group();
-  g.name = "notepad";
-  const w = 0.165, d = w * 1088 / 768, t = 0.012;
-  const block = box(w, t, d, new THREE.MeshStandardMaterial({ color: 0xe9d877, roughness: 0.9 }), 0.0015, 1);
-  block.position.y = t / 2;
-  g.add(block);
-  const page = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: notepadTexture(data.about), roughness: 1 }));
-  page.rotation.x = -Math.PI / 2;
-  page.position.y = t + 0.0004;
-  g.add(page);
-  const loose = new THREE.Mesh(new THREE.PlaneGeometry(w, d * 0.96), new THREE.MeshStandardMaterial({ color: 0xf2e183, roughness: 0.9 }));
-  loose.rotation.set(-Math.PI / 2, 0, 0.18);
-  loose.position.set(0.03, 0.0008, 0.02);
-  g.add(loose);
-  const pen = new THREE.Group();
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.12, 20), new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.3, metalness: 0.2 }));
+  g.name = "tablet";
+  const w = 0.16, d = w * 1088 / 768, t = 0.0075;
+  const body = box(w + 0.012, t, d + 0.012, new THREE.MeshStandardMaterial({ color: 0x1a1f26, roughness: 0.35, metalness: 0.6 }), 0.006, 3);
+  body.position.y = t / 2;
+  g.add(body);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tabletTexture(data.about), color: new THREE.Color(1.25, 1.25, 1.25) }));
+  screen.rotation.x = -Math.PI / 2;
+  screen.position.y = t + 0.0004;
+  g.add(screen);
+  // bordo luminoso sottile, come un dispositivo acceso
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.0125, 0.0008, d + 0.0125), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.55, 0.15) }));
+  edge.position.y = t * 0.55;
+  g.add(edge);
+  // stilo
+  const stylus = new THREE.Group();
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0038, 0.0038, 0.13, 20), M.alu);
   barrel.rotation.z = Math.PI / 2;
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0045, 0.018, 20), M.steel);
-  tip.rotation.z = -Math.PI / 2; tip.position.x = 0.069;
-  const clip = box(0.04, 0.0015, 0.003, M.steel, 0.0006);
-  clip.position.set(-0.035, 0.005, 0);
-  const capEnd = new THREE.Mesh(new THREE.CylinderGeometry(0.0047, 0.0047, 0.012, 20), new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.4 }));
-  capEnd.rotation.z = Math.PI / 2; capEnd.position.x = -0.064;
-  pen.add(barrel, tip, clip, capEnd);
-  pen.position.set(w / 2 + 0.03, 0.0045, 0.01);
-  pen.rotation.y = 1.2;
-  g.add(pen);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0038, 0.014, 20), new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5 }));
+  tip.rotation.z = -Math.PI / 2; tip.position.x = 0.072;
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.65, 0.2) }));
+  ring.rotation.z = Math.PI / 2; ring.position.x = -0.05;
+  stylus.add(barrel, tip, ring);
+  stylus.position.set(w / 2 + 0.03, 0.0038, 0.01);
+  stylus.rotation.y = 1.2;
+  g.add(stylus);
   shadow(g);
-  return { group: g, page };
+  screen.castShadow = false; edge.castShadow = false;
+  return { group: g, screen };
 }
 
 // ---------------------------------------------------------------------------
@@ -725,7 +725,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   updaters.push(monitor.update);
   sections.dev = monitor.group;
 
-  const pad = createNotepad(M, data);
+  const pad = createTablet(M, data);
   place(pad.group, 0.05, 0.13, -0.1);
   sections.about = pad.group;
   onProgress(0.3);
@@ -808,8 +808,8 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   };
 }
 
-// insegna al neon: una forma d'onda rosso-magenta sotto il davanzale, dietro i synth,
-// e una striscia LED ciano lungo il bordo posteriore del banco
+// insegna al neon: una forma d'onda rosso segnale sotto il davanzale, dietro i synth,
+// e una striscia LED ambra lungo il bordo posteriore del banco
 function createNeon() {
   const g = new THREE.Group();
   g.name = "neon";
@@ -821,7 +821,7 @@ function createNeon() {
     pts.push(V(x, Y + 0.16 + Math.sin(u * Math.PI * 7) * 0.045 * env + Math.sin(u * Math.PI * 19) * 0.008 * env, z));
   }
   const wave = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, 0.0035, 8),
-    new THREE.MeshStandardMaterial({ color: 0x220008, emissive: 0xff1f55, emissiveIntensity: 3.2 }));
+    new THREE.MeshStandardMaterial({ color: 0x220008, emissive: 0xff4a2a, emissiveIntensity: 3.2 }));
   g.add(wave);
   // supporti trasparenti e cavetto
   const clipMat = new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.2, transparent: true, opacity: 0.5 });
@@ -831,13 +831,13 @@ function createNeon() {
     g.add(c);
   }
   const strip = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.006, 0.008),
-    new THREE.MeshStandardMaterial({ color: 0x001018, emissive: 0x19d9ff, emissiveIntensity: 3.2 }));
+    new THREE.MeshStandardMaterial({ color: 0x140a00, emissive: 0xffa23c, emissiveIntensity: 2.4 }));
   strip.position.set(-0.44, Y + 0.004, DESK.z0 + 0.006);
   g.add(strip);
   // luce colorata sul muro
-  const pink = new THREE.PointLight(0xff2a6a, 0.22, 0.9, 2);
+  const pink = new THREE.PointLight(0xff5a3d, 0.22, 0.9, 2);
   pink.position.set(0.59, Y + 0.26, z + 0.025);
-  const cyan = new THREE.PointLight(0x19c8ff, 0.22, 1.0, 2);
+  const cyan = new THREE.PointLight(0xffa64a, 0.18, 1.0, 2);
   cyan.position.set(-0.2, Y + 0.12, z + 0.02);
   g.add(pink, cyan);
   const mat = wave.material;
