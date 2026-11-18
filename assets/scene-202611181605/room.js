@@ -218,13 +218,10 @@ vec3 water(float az, float el, float blur, float t) {
     float w = 0.0006 + dep * 0.007 + blur * 0.0009;
     for (int i = 0; i < LAMPS; i++) {
       float dx = (uu - lampU(i)) * HWB / w;
-      col += vec3(1.0, 0.80, 0.52) * exp(-dx * dx) * brk * exp(-dep / 0.03) * 0.55;
+      col += SODIUM * exp(-dx * dx) * brk * exp(-dep / 0.03) * 0.26;
     }
-    if (abs(uu) < 1.0) {                                         // l'arco illuminato, capovolto
-      float da = (dep - bridgeUnder(uu)) / (0.0016 + dep * 0.22);
-      col += vec3(0.20, 0.40, 0.72) * exp(-da * da) * (0.35 + 0.65 * brk) * 0.7;
-    }
-    if (inCastle(uu)) col += vec3(0.34, 0.19, 0.07) * exp(-dep / 0.022) * (0.3 + 0.7 * brk);
+    if (abs(uu) < 1.0) col *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, DECK, dep));   // sotto il ponte l'acqua e' piu' scura
+    if (inCastle(uu)) col += vec3(0.085, 0.050, 0.020) * exp(-dep / 0.022) * (0.3 + 0.7 * brk);
   }
   // riflesso rosso tremolante
   col += redLights(az + (vnoise(vec2(wp.y * 0.3, t)) - 0.5) * dep * 0.1, HOR + dep * 0.25 + 0.01, blur + 1.5, t) * 0.25 * exp(-dep / 0.05);
@@ -238,25 +235,27 @@ vec3 townNight(float u, float y) {
     float shade = mix(0.42, towerShade(u, y), towers(u));          // cortina in ombra, torri tonde in luce
     float foot = 0.35 + 0.65 * exp(-y / 0.014);
     float stone = 0.85 + 0.15 * vnoise(vec2(u * 60.0, y * 1400.0));
-    c = vec3(0.66, 0.38, 0.14) * shade * foot * stone * 0.8;
+    c = vec3(0.012, 0.011, 0.013) + vec3(0.30, 0.175, 0.075) * shade * foot * stone * 0.5;   // luce bassa e calda, non un faro
   }
   return c;
 }
-vec3 bridgeNight(vec3 col, float u, float y, float blur) {
+// Ponte di notte: una sagoma in controluce sul chiarore dell'orizzonte, con i lampioni dello stesso colore
+// e della stessa forza di quelli del lungomare. Deve stare dentro il paesaggio, non staccarsi.
+vec3 bridgeNight(vec3 col, float u, float y, float blur, float t) {
   float edge = 0.0005 + blur * 0.0010;
   float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
-  // trave d'acciaio illuminata dal basso con luce fredda
-  vec3 steel = vec3(0.03, 0.05, 0.085) + vec3(0.09, 0.20, 0.40) * exp(-max(y - yb, 0.0) / 0.0030);
-  steel *= 1.0 - 0.5 * exp(-abs(u) / 0.012);                    // il giunto al centro, dove le due meta' si toccano
+  vec3 steel = vec3(0.015, 0.016, 0.021) + vec3(0.040, 0.024, 0.011) * exp(-max(DECK - y, 0.0) / 0.004);
   col = mix(col, steel, bridgeMask(u, y, edge));
-  if (abs(u) < 1.0) {                                           // filo di luce lungo l'arco
-    float da = (y - yb) / (0.0007 + blur * 0.0011);
-    col += vec3(0.35, 0.62, 1.0) * exp(-da * da) * 1.0;
+  if (abs(u) < 1.0) {                                           // un filo di luce calda sotto l'arco, riflessa dall'acqua
+    float da = (y - yb) / (0.0008 + blur * 0.0011);
+    col += vec3(0.085, 0.050, 0.020) * exp(-da * da);
   }
-  float rad = 0.0010 + blur * 0.0012;
+  float rad = 0.0009 + blur * 0.0012;
   for (int i = 0; i < LAMPS; i++) {
-    vec2 d = vec2((u - lampU(i)) * HWB, y - (DECK + 0.0042));
-    col += vec3(1.0, 0.80, 0.52) * exp(-dot(d, d) / (rad * rad)) * 1.6;
+    float fi = float(i);
+    vec2 d = vec2((u - lampU(i)) * HWB, y - (DECK + 0.0036));
+    float flick = 0.9 + 0.1 * sin(t * (2.0 + h11(fi + 2.0) * 3.0) + fi);
+    col += SODIUM * exp(-dot(d, d) / (rad * rad)) * (0.50 + 0.35 * h11(fi + 4.0)) * flick;
   }
   return col;
 }
@@ -277,7 +276,7 @@ vec3 outside(vec3 dir, float blur, float t) {
     col = mix(sky(az, el, t), hill, land);
     col += lightsAt(az, el, blur, ce, t);
     col += redLights(az, el, blur, t);
-    if (abs(u) < 1.4) col = bridgeNight(col, u, y, blur);
+    if (abs(u) < 1.4) col = bridgeNight(col, u, y, blur, t);
   }
   // foschia sul pelo dell'acqua
   col += vec3(0.05, 0.04, 0.035) * exp(-abs(el - HOR) / 0.006) * 0.5;
@@ -320,19 +319,20 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
     vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR));
-    if (abs(u) < 3.1) hill = mix(hill, townDay(u, y), townK(u));
+    if (abs(u) < 3.1) hill = mix(hill, mix(townDay(u, y), daySky(az, HOR + 0.02, t), 0.42), townK(u));   // velati dalla distanza
     col = mix(daySky(az, el, t), hill, land);
     if (abs(u) < 1.4) {                                          // ponte girevole: acciaio grigio azzurro, parapetto e lampioni
       float be = 0.0005 + blur * 0.0010;
       float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
       vec3 steel = mix(vec3(0.12, 0.16, 0.20), vec3(0.26, 0.33, 0.38), smoothstep(yb, DECK, y));
       steel *= 1.0 - 0.4 * exp(-abs(u) / 0.012);
+      steel = mix(steel, daySky(az, HOR + 0.02, t), 0.36);
       col = mix(col, steel, bridgeMask(u, y, be));
       float rail = (1.0 - smoothstep(0.0, 0.0012 + be, abs(y - DECK - 0.0012))) * step(abs(u), 1.12);
-      col = mix(col, vec3(0.16, 0.19, 0.22), rail * 0.8);
+      col = mix(col, vec3(0.30, 0.34, 0.38), rail * 0.6);
       for (int i = 0; i < LAMPS; i++) {
         float post = (1.0 - smoothstep(0.0, 0.0011 + be, abs(u - lampU(i)) * HWB)) * step(DECK, y) * (1.0 - smoothstep(DECK + 0.0048, DECK + 0.0056, y));
-        col = mix(col, vec3(0.15, 0.18, 0.20), post * 0.85);
+        col = mix(col, vec3(0.30, 0.34, 0.38), post * 0.6);
       }
     }
   }
