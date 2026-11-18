@@ -6,8 +6,8 @@ import * as THREE from "three";
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const RAD = THREE.MathUtils.degToRad;
 const clamp = THREE.MathUtils.clamp;
-const LIMIT = { yaw: RAD(20), up: RAD(16), down: RAD(9), near: 0.55, far: 1.2 };   // quanto ci si puo' spostare dalla vista
-const ROOM = { x0: -1.42, x1: 1.14, y0: 0.9, y1: 2.45 };                           // la camera resta dentro la stanza
+const LIMIT = { yaw: RAD(20), up: RAD(16), down: RAD(13), near: 0.55, far: 1.2 };   // quanto ci si puo' spostare dalla vista
+const ROOM = { x0: -1.42, x1: 1.14, y0: 0.86, y1: 2.45 };                           // la camera resta dentro la stanza
 
 export class CameraRig {
   constructor(camera, views, { reducedMotion = false } = {}) {

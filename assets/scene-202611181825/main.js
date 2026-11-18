@@ -15,6 +15,7 @@ import { setAnisotropy } from "./textures.js";
 import { UI } from "./ui.js";
 import { SceneAudio } from "./audio.js";
 import { LiveMode } from "./live.js";
+import { heavens } from "./sky.js";
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
@@ -164,17 +165,27 @@ export async function start({ data, root, force, toLofi }) {
   const live = new LiveMode({
     clock,
     onChange(s) {
-      const text = ui.setWeather(s), key = s.kind + "|" + s.temp + "|" + s.where;
+      const { text, lines } = ui.setWeather(s), key = s.kind + "|" + s.temp + "|" + s.where;
+      room.setProjection(lines);   // il meteo si legge sul vetro della finestra
+      updateHeavens(s.day);
       if (s.weather === "ok" && key !== spoken) { spoken = key; ui.announce(text); } // si annuncia quando cambia il tempo, non a ogni minuto
       const jump = !look || Math.abs(look.day - s.day) > 0.12 || Math.abs(look.rain - s.rain) > 0.2 || Math.abs(look.cloud - s.cloud) > 0.3;
       if (jump) fadeLook(s); else if (fadeTimer) fadeTo = s; else applyLook(s);
     },
   });
+  // cielo vero (stelle e Luna, vedi sky.js): solo "dal vivo" e solo quando fuori non e' giorno pieno
+  function updateHeavens(day = look ? look.day : 1) {
+    const on = themeMode() === "live" && live.active && day < 0.98;
+    room.setHeavens(on ? heavens(clock(), live.place.lat, live.place.lon) : null);
+  }
+  setInterval(() => { if (themeMode() === "live" && !root.hidden) updateHeavens(); }, 15000);   // le stelle si spostano piano: basta ogni 15 secondi
   function setTheme(mode, { ask = false } = {}) {
     if (mode === "live") { live.start({ ask }); return; }
     live.stop();
     spoken = "";
     ui.setWeather(null);
+    room.setProjection(null);
+    room.setHeavens(null);
     const next = FIXED[mode];
     if (look !== next) fadeLook(next);
   }

@@ -383,10 +383,7 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 .scene-theme .scene-ctl:last-child { border-radius: 0 2px 2px 0; }
 .scene-theme .scene-ctl[aria-pressed="true"] { position: relative; z-index: 1; color: var(--sc-accent); border-color: var(--sc-accent); box-shadow: inset 0 -2px 0 var(--sc-accent); }
 /* Stato della modalita' "dal vivo": che tempo fa, che ora e' e dove, con la citazione della fonte */
-.scene-weather {
-  position: absolute; right: 20px; bottom: 68px; z-index: 3; margin: 0; max-width: 360px; padding: 8px 12px; text-align: right;
-  font-size: 14px; line-height: 1.35; background: var(--sc-chip); color: var(--sc-text); border: 1px solid var(--sc-chip-line); border-radius: 2px;
-}
+.scene-weather { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }  /* si legge sul vetro: questo e' per i lettori di schermo */
 .scene-weather[hidden] { display: none; }
 .scene-weather strong { display: block; font-weight: 700; }
 .scene-weather small { display: block; font-size: 12.5px; color: var(--sc-muted); }

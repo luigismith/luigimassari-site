@@ -94,18 +94,22 @@ export class UI {
   }
 
   // Stato della modalita' "dal vivo": che tempo fa, che ora e' e dove (la zona del visitatore oppure Taranto),
-  // piu' la citazione di MET Norway. Con null il riquadro sparisce. Restituisce il testo, per l'annuncio.
+  // piu' la citazione di MET Norway. Il testo si legge proiettato sul vetro della scena (room.setProjection);
+  // il riquadro HTML resta solo per i lettori di schermo. Con null sparisce tutto.
   setWeather(s) {
-    if (!s) { this.weatherBox.hidden = true; return ""; }
-    const u = this.data.ui, here = s.where === "you";
+    if (!s) { this.weatherBox.hidden = true; return { text: "", lines: null }; }
+    const u = this.data.ui, here = s.where === "you", ok = s.weather === "ok";
     const time = s.date.toLocaleTimeString(document.documentElement.lang || "it", { hour: "2-digit", minute: "2-digit", ...(here ? {} : { timeZone: "Europe/Rome" }) });
-    const main = s.weather === "ok" ? u.live_kinds[s.kind] + (s.temp === null ? "" : ", " + s.temp + " °C") : s.weather === "wait" ? u.live_wait : u.live_none;
+    const kind = ok ? u.live_kinds[s.kind] : s.weather === "wait" ? u.live_wait : u.live_none;
+    const temp = ok && s.temp !== null ? s.temp + " °C" : "";
+    const main = kind + (temp ? ", " + temp : "");
     const sub = (here ? u.live_you : u.live_taranto).replace("{time}", time) + (s.weather === "none" ? " " + u.live_light : "");
     this.weatherMain.textContent = main;
     this.weatherSub.textContent = sub;
     this.weatherCredit.hidden = s.weather === "none";
     this.weatherBox.hidden = false;
-    return main + ". " + sub;
+    // text: per l'annuncio ai lettori di schermo; lines: quello che la scena proietta sul vetro
+    return { text: main + ". " + sub, lines: { big: temp, main: kind, sub, credit: s.weather === "none" ? "" : u.live_credit } };
   }
 
   setSound(on) {
