@@ -350,7 +350,10 @@ export async function start({ data, root, force, toLofi }) {
 
   run(true);
   ui.progress(1);
-  const firstFps = await measureFirstSecond();
+  // sotto i 30 fps nel primo secondo si passa alla versione classica; un singhiozzo iniziale
+  // (shader, texture, GPU occupata) non basta: si conferma con un secondo in piu'
+  let firstFps = await measureFirstSecond();
+  if (firstFps < 30 && !force) firstFps = Math.max(firstFps, await measureFirstSecond());
   const api = {
     pause() { run(false); audio.setVisible(false); },
     resume() { run(true); audio.setVisible(true); },
