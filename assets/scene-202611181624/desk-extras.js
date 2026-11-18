@@ -42,24 +42,73 @@ function midiKeyboard(M) {
 
 // cuffie appoggiate sul banco
 function headphones(M) {
+  // Cuffia chiusa appoggiata in piedi sui padiglioni, come la si posa sul banco: archetto largo e imbottito,
+  // forcelle in metallo, cuscinetti morbidi, cavo. L'asse orecchio-orecchio e' x; il davanti e' +z.
   const g = new THREE.Group();
   g.name = "headphones";
-  const cushionMat = std(0x141518, 0.85), accent = std(0xffb44a, 0.4, 0.3);
+  const shell = std(0x17191d, 0.42, 0.25), soft = std(0x24272c, 0.95), cloth = std(0x0b0c0e, 0.85);
+  const plate = std(0x2f3842, 0.38, 0.75), accent = std(0xffb44a, 0.35, 0.6);
+  const R = 0.044, CX = 0.076, CY = 0.047;         // raggio del padiglione, distanza dal centro, quota del suo centro
+  const BR = 0.078, BY = 0.122;                    // raggio e quota del centro dell'archetto
+  // guscio tornito: un disco bombato; l'asse del tornio (y) diventa l'asse orecchio-orecchio
+  const prof = [[0, 0.019], [0.026, 0.0186], [0.036, 0.0155], [0.0422, 0.009], [R, 0.001], [R, -0.008], [0.041, -0.013], [0, -0.013]]
+    .map(([r, h]) => new THREE.Vector2(r, h));
+  const shellGeo = new THREE.LatheGeometry(prof, 48);
+  const cushionGeo = new THREE.TorusGeometry(0.031, 0.0135, 14, 40);
+  const yokeGeo = new THREE.TorusGeometry(R + 0.006, 0.0032, 8, 32, Math.PI);
   for (const sx of [-1, 1]) {
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.046, 0.028, 36), M.dark);
-    cup.position.set(sx * 0.088, 0.014, 0);
-    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.011, 10, 30), cushionMat);
-    cushion.rotation.x = Math.PI / 2;
-    cushion.position.set(sx * 0.088, 0.03, 0);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0445, 0.0014, 6, 36), accent);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(sx * 0.088, 0.006, 0);
-    g.add(cup, cushion, ring);
+    const cup = new THREE.Group();
+    const body = new THREE.Mesh(shellGeo, shell);
+    body.rotation.z = -sx * Math.PI / 2;           // la faccia esterna guarda fuori
+    const cushion = new THREE.Mesh(cushionGeo, soft);
+    cushion.rotation.y = Math.PI / 2;
+    cushion.position.x = -sx * 0.021;
+    const grille = new THREE.Mesh(new THREE.CircleGeometry(0.03, 32), cloth);
+    grille.rotation.y = -sx * Math.PI / 2;
+    grille.position.x = -sx * 0.0145;
+    const cap = new THREE.Mesh(new THREE.CircleGeometry(0.0245, 40), plate);   // piastra in metallo sul fianco
+    cap.rotation.y = sx * Math.PI / 2;
+    cap.position.x = sx * 0.0192;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0262, 0.0011, 8, 48), accent);
+    ring.rotation.y = Math.PI / 2;
+    ring.position.x = sx * 0.0188;
+    // forcella: mezzo anello intorno al padiglione, con i due perni
+    const yoke = new THREE.Mesh(yokeGeo, M.steel);
+    yoke.rotation.y = Math.PI / 2;
+    yoke.position.x = sx * 0.003;
+    cup.add(body, cushion, grille, cap, ring, yoke);
+    for (const sz of [-1, 1]) {
+      const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0042, 0.009, 12), M.steel);
+      pivot.rotation.x = Math.PI / 2;
+      pivot.position.set(sx * 0.003, 0, sz * (R + 0.002));
+      cup.add(pivot);
+    }
+    cup.position.set(sx * CX, CY, 0);
+    cup.rotation.z = sx * 0.07;                    // in alto i padiglioni chiudono appena verso l'interno
+    g.add(cup);
+    // asta che scorre nell'archetto e blocchetto della cerniera
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.034, 10), M.steel);
+    stem.position.set(sx * (CX + 0.0005), CY + R + 0.02, 0);
+    const hinge = box(0.012, 0.024, 0.03, shell, 0.004, 2);
+    hinge.position.set(sx * BR, BY - 0.004, 0);
+    g.add(stem, hinge);
   }
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.0065, 10, 40, Math.PI), M.dark);
-  band.rotation.x = -Math.PI / 2;
-  band.position.y = 0.018;
-  g.add(band);
+  // archetto: mezzo anello schiacciato (largo e sottile) e, sotto, l'imbottitura
+  const band = new THREE.Mesh(new THREE.TorusGeometry(BR, 0.0042, 12, 56, Math.PI), shell);
+  band.scale.z = 3.4;
+  band.position.y = BY;
+  const padding = new THREE.Mesh(new THREE.TorusGeometry(BR - 0.0056, 0.0044, 10, 40, Math.PI * 0.6), soft);
+  padding.scale.z = 2.9;
+  padding.rotation.z = Math.PI * 0.2;
+  padding.position.y = BY;
+  g.add(band, padding);
+  // cavo che esce dal padiglione sinistro e si posa sul banco, con lo spinotto
+  const pts = [[-CX, 0.012, 0.012], [-CX - 0.012, 0.004, 0.04], [-0.06, 0.0025, 0.082], [-0.01, 0.0025, 0.07], [0.035, 0.0025, 0.098], [0.07, 0.0025, 0.142]];
+  const cable = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => V(x, y, z))), 48, 0.0016, 6), shell);
+  const plug = new THREE.Mesh(new THREE.CylinderGeometry(0.0026, 0.0026, 0.022, 10), M.steel);
+  plug.rotation.set(Math.PI / 2, 0, -0.65);
+  plug.position.set(0.077, 0.0028, 0.151);
+  g.add(cable, plug);
   return g;
 }
 
@@ -402,7 +451,7 @@ export function createExtras(data) {
   place(printerObj.group, -0.9, 0.08, 0.28);
   place(prints(), -0.63, 0.1, 0.4);
   place(midiKeyboard(M), 0.6, 0.335, 0.03);
-  place(headphones(M), -0.6, 0.31, 0.5);
+  place(headphones(M), -0.56, 0.31, 0.62);
   place(handheld(M, data.about.projects[0][0]), -0.2, 0.33, -0.2);
   place(cabinet(M), 1.035, -0.27, -0.1);
   place(breadboard(M), 0.27, 0.3, 0.25);
