@@ -1,5 +1,5 @@
 // Suono della scena con la Web Audio API: niente file audio.
-// Pioggia e ronzio della lampada solo se l'utente sceglie "Suono si'"; ogni synth ha la sua frase.
+// Un tappeto sonoro morbido solo se l'utente sceglie "Suono si'"; ogni synth ha la sua frase.
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -71,60 +71,35 @@ export class SceneAudio {
     g.exponentialRampToValueAtTime(to, t + 0.35);
   }
 
-  // --- ambiente: pioggia (rumore filtrato con piccole modulazioni) + ronzio di rete ---
+  // --- ambiente: un tappeto sonoro morbido, niente rumore. Quinte aperte e una nona (ne' maggiore
+  // ne' minore), onde dolci, filtro che si muove piano, riverbero. Entra in cinque secondi, a volume basso.
   startAmbience() {
     const ctx = this.ctx, t = ctx.currentTime;
     const out = ctx.createGain();
-    out.gain.value = 1;
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.06, t + 5);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 700; lp.Q.value = 0.7;
+    lp.connect(out);
     out.connect(this.master);
-    const loop = (gain) => {
-      const s = ctx.createBufferSource();
-      s.buffer = this.noise; s.loop = true;
-      s.loopStart = Math.random(); s.start(t, Math.random() * 1.5);
-      const g = ctx.createGain(); g.gain.value = gain;
-      s.connect(g);
-      return g;
-    };
-    // fruscio largo della pioggia
-    const body = loop(0.16);
-    const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1400; bp.Q.value = 0.45;
-    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5200;
-    body.connect(bp).connect(lp).connect(out);
-    // ticchettio sul vetro
-    const tick = loop(0.05);
-    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 3800;
-    const tickAmp = ctx.createGain(); tickAmp.gain.value = 0.25;
-    tick.connect(hp).connect(tickAmp).connect(out);
-    // modulazioni lente: la pioggia va e viene
+    out.connect(this.verb);
     const lfo = (freq, depth, param) => {
       const o = ctx.createOscillator(); o.frequency.value = freq;
       const d = ctx.createGain(); d.gain.value = depth;
       o.connect(d).connect(param); o.start(t);
     };
-    lfo(0.07, 0.05, body.gain);
-    lfo(0.13, 300, bp.frequency);
-    lfo(0.21, 0.15, tickAmp.gain);
-    // gocce piu' grosse, a caso
-    this.dropTimer = setInterval(() => {
-      if (!this.enabled || ctx.state !== "running") return;
-      const when = ctx.currentTime + Math.random() * 0.2;
-      const s = ctx.createBufferSource(); s.buffer = this.noise;
-      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2000 + Math.random() * 3000; f.Q.value = 4;
+    lfo(0.045, 260, lp.frequency);
+    // La2, Mi3, Si3, Mi4
+    [[110, 0.5], [164.81, 0.34], [246.94, 0.22], [329.63, 0.14]].forEach(([f, a], i) => {
       const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, when);
-      g.gain.exponentialRampToValueAtTime(0.05 + Math.random() * 0.05, when + 0.002);
-      g.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
-      s.connect(f).connect(g).connect(out);
-      s.start(when, Math.random()); s.stop(when + 0.05);
-    }, 140);
-    // ronzio bassissimo della lampada (rete a 50 Hz e armoniche)
-    const hum = ctx.createGain(); hum.gain.value = 0.012;
-    const humLp = ctx.createBiquadFilter(); humLp.type = "lowpass"; humLp.frequency.value = 400;
-    hum.connect(humLp).connect(out);
-    [[50, 1], [100, 0.5], [150, 0.25], [200, 0.12]].forEach(([f, a]) => {
-      const o = ctx.createOscillator(); o.frequency.value = f;
-      const g = ctx.createGain(); g.gain.value = a;
-      o.connect(g).connect(hum); o.start(t);
+      g.gain.value = a;
+      g.connect(lp);
+      lfo(0.03 + i * 0.017, a * 0.45, g.gain); // ogni voce respira per conto suo
+      for (const [type, det] of [["sine", -4], ["triangle", 5]]) {
+        const o = ctx.createOscillator();
+        o.type = type; o.frequency.value = f; o.detune.value = det;
+        o.connect(g); o.start(t);
+      }
     });
     return out;
   }

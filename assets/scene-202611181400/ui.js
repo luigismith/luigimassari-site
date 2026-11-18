@@ -192,6 +192,7 @@ export class UI {
     }
     const primary = h("a", { class: "btn btn-primary", href: p.primary_href, rel: p.stripe ? "noopener" : null }, p.primary_label);
     const card = h("article", { class: "sp-card", "aria-labelledby": "sp-card-h" },
+      p.image ? h("img", { class: "sp-card-img", src: p.image, alt: p.image_alt, loading: "lazy" }) : null,
       h("p", { class: "status status-" + p.status }, p.status_label),
       h("h3", { id: "sp-card-h", tabindex: "-1" }, p.name),
       h("p", {}, p.tagline),

@@ -9,6 +9,7 @@ import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createRoom } from "./room.js";
 import { createDesk, createLamp, createObjects, mergeStatic } from "./desk-objects.js";
+import { createExtras } from "./desk-extras.js";
 import { CameraRig } from "./camera-rig.js";
 import { setAnisotropy } from "./textures.js";
 import { UI } from "./ui.js";
@@ -96,6 +97,7 @@ export async function start({ data, root, force, toLofi }) {
   await nextFrame();
   const objects = await createObjects(ctx, desk.woodMap, (f) => ui.progress(0.6 + f * 0.3));
   scene.add(objects.group);
+  scene.add(createExtras(data).group);
   mergeStatic(desk.group);
   mergeStatic(room.group);
   mergeStatic(lamp.group);

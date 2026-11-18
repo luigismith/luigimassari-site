@@ -257,3 +257,5 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 .scene-progress span { background: var(--sodio); box-shadow: 0 0 10px var(--sodio); }
 .scene-sound-choice button { border-radius: 2px; }
 .scene-sound-choice button[aria-pressed="true"] { background: var(--sodio); color: #14100A; border-color: var(--sodio); }
+
+.sp-card-img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 3px; margin-bottom: 12px; }

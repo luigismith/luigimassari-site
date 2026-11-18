@@ -451,3 +451,11 @@ a:hover, .theme-dark a:hover { color: var(--sodio); }
   .hero-media::after { background: linear-gradient(0deg, var(--notte) 0%, rgba(10, 22, 34, 0) 60%); }
   .hero-inner { padding-top: var(--s4); padding-bottom: var(--s7); }
 }
+
+/* Rendering degli strumenti (dove ci sono, sostituiscono l'illustrazione del frontale) */
+.product-art img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 40px -28px #000; }
+.instrument-art img { width: 100%; aspect-ratio: 600 / 380; object-fit: cover; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 40px -28px #000; }
+.product-card .product-art img { aspect-ratio: 600 / 380; object-fit: cover; }
+.product-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s3); }
+.product-gallery img { aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; }
+.render-note { font-size: 14px; color: var(--muted); margin-top: var(--s2); }

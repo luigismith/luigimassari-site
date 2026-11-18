@@ -60,7 +60,7 @@ export function mergeStatic(root) {
   return root;
 }
 
-function box(w, h, d, mat, r = 0.004, seg = 2) {
+export function box(w, h, d, mat, r = 0.004, seg = 2) {
   return new THREE.Mesh(new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4)), mat);
 }
 
@@ -159,7 +159,7 @@ const KNOB_SKIRT = new THREE.CylinderGeometry(1.18, 1.22, 0.18, 40);
 const KNOB_CAP = new THREE.CylinderGeometry(0.66, 0.66, 0.06, 32);
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 
-function knob3d(M, r, h, angleDeg) {
+export function knob3d(M, r, h, angleDeg) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(KNOB_BODY, M.knob);
   body.scale.set(r, h, r); body.position.y = h / 2;
