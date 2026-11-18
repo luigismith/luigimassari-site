@@ -374,3 +374,25 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .scene-canvas canvas { transition: none; } }
 /* Tema chiaro: velatura della barra piu' piena, perche' le voci scure non si perdano sul telaio nero della vetrata */
 :root[data-theme="light"] .scene-bar { background: linear-gradient(to bottom, rgb(var(--sc-ink) / .94) 0%, rgb(var(--sc-ink) / .86) 55%, rgb(var(--sc-ink) / 0) 100%); padding-bottom: 28px; }
+
+/* Tema nella scena: tre pulsanti uniti (scuro, chiaro, dal vivo). Quello attivo ha colore d'accento e un filo sotto,
+   quindi lo stato si legge anche senza colore. */
+.scene-theme { display: inline-flex; }
+.scene-theme .scene-ctl { border-radius: 0; margin-left: -1px; padding: 0 12px; }
+.scene-theme .scene-ctl:first-child { margin-left: 0; border-radius: 2px 0 0 2px; }
+.scene-theme .scene-ctl:last-child { border-radius: 0 2px 2px 0; }
+.scene-theme .scene-ctl[aria-pressed="true"] { position: relative; z-index: 1; color: var(--sc-accent); border-color: var(--sc-accent); box-shadow: inset 0 -2px 0 var(--sc-accent); }
+/* Stato della modalita' "dal vivo": che tempo fa, che ora e' e dove, con la citazione della fonte */
+.scene-weather {
+  position: absolute; right: 20px; bottom: 68px; z-index: 3; margin: 0; max-width: 360px; padding: 8px 12px; text-align: right;
+  font-size: 14px; line-height: 1.35; background: var(--sc-chip); color: var(--sc-text); border: 1px solid var(--sc-chip-line); border-radius: 2px;
+}
+.scene-weather[hidden] { display: none; }
+.scene-weather strong { display: block; font-weight: 700; }
+.scene-weather small { display: block; font-size: 12.5px; color: var(--sc-muted); }
+.scene-weather a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.scene-weather a:hover { color: var(--sc-accent); }
+/* L'inquadratura si sposta trascinando: il cursore lo dice (sugli oggetti cliccabili resta la mano che indica) */
+.scene-canvas { cursor: grab; touch-action: none; }
+.scene.is-hover .scene-canvas { cursor: pointer; }
+.scene.is-dragging .scene-canvas { cursor: grabbing; }

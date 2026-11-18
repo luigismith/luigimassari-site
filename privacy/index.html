@@ -19,8 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
-<link rel="stylesheet" href="/assets/site.css?v=202611181701">
+<script>try{var m=localStorage.getItem("lm-theme"),h=new Date().getHours(),d=document.documentElement;if(m==="live")d.dataset.themeMode="live";if(m==="light"||(m==="live"&&h>=7&&h<19))d.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181759">
 
 
 
@@ -33,14 +33,20 @@
     <nav id="nav" class="tuner" aria-label="Sezioni del sito" data-tuner>
       <ul>
         <li><a href="/consulenza/" data-station="dev">Consulenza IT e AI</a></li>
-        <li><a href="/#stampa-3d" data-station="print">Stampa 3D e laser</a></li>
-        <li><a href="/elettrofoni/" data-station="shop">Strumenti</a></li>
+        <li><a href="/#stampa-3d" data-station="print">3D e laser</a></li>
+        <li><a href="/elettrofoni/" data-station="shop">Synth e DIY</a></li>
         <li><a href="/#formazione" data-station="lab">Formazione</a></li>
         <li><a href="/contatti/" data-station="contact">Contatti</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
-    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Chiaro" data-label-dark="Scuro" title="Passa dal tema scuro al tema chiaro e viceversa">Chiaro</button>
+    <label class="theme-select"><span class="visually-hidden">Tema</span>
+      <select class="lang" data-theme-select title="Dal vivo: nella versione 3D la luce e il meteo sono quelli veri del posto in cui ti trovi (chiede la posizione); nelle altre pagine il tema segue l&#39;ora">
+        <option value="dark">Scuro</option>
+        <option value="light">Chiaro</option>
+        <option value="live">Dal vivo</option>
+      </select>
+    </label>
     <a class="lang" href="/en/privacy/" hreflang="en" lang="en">English</a>
   </div>
 </header>
@@ -56,15 +62,18 @@
 <p>Luigi Massari, Taranto (TA), Italia. Email: <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>.</p>
 
 <h2>Quali dati tratto e perché</h2>
-<p><strong>Navigazione.</strong> Il sito è ospitato da OVHcloud, che registra nei log tecnici del server dati come indirizzo IP, data e pagina richiesta, per sicurezza e funzionamento del servizio (legittimo interesse, art. 6.1.f GDPR). I log sono conservati per il tempo previsto dal fornitore.</p>
+<p><strong>Navigazione.</strong> Il sito è ospitato su GitHub Pages, servizio di GitHub, Inc. (Stati Uniti), che registra nei log tecnici del server dati come indirizzo IP, data e pagina richiesta, per sicurezza e funzionamento del servizio (legittimo interesse, art. 6.1.f GDPR). I log sono conservati per il tempo previsto dal fornitore.</p>
 <p><strong>Contatti.</strong> Se mi scrivi, tratto nome, email e contenuto del messaggio solo per risponderti e, se richiesto, preparare un preventivo (misure precontrattuali, art. 6.1.b). Il modulo del sito non salva nulla: apre il tuo programma di posta.</p>
 <p><strong>Acquisti.</strong> I pagamenti avvengono su Stripe, che tratta i dati di pagamento come titolare autonomo; io ricevo nome, email, indirizzo di spedizione e dettagli dell'ordine per evadere l'acquisto e adempiere agli obblighi fiscali (art. 6.1.b e 6.1.c). Non vedo né conservo i dati della carta. I dati dell'ordine sono conservati per 10 anni per obblighi contabili.</p>
 
 <h2>Cookie</h2>
-<p>Il sito non usa cookie di profilazione né strumenti di analisi o pubblicità. I caratteri tipografici sono ospitati sul sito stesso, senza chiamate a servizi esterni. Al momento del pagamento Stripe può usare cookie tecnici necessari alla sicurezza della transazione.</p>
+<p>Il sito non usa cookie di profilazione né strumenti di analisi o pubblicità. I caratteri tipografici sono ospitati sul sito stesso. L'unica chiamata a un servizio esterno è quella della modalità «Dal vivo», descritta qui sotto, e parte solo se la scegli. Al momento del pagamento Stripe può usare cookie tecnici necessari alla sicurezza della transazione.</p>
+
+<h2>Modalità «Dal vivo»</h2>
+<p>La versione 3D della home ha tre modalità di visualizzazione: scura, chiara e «Dal vivo». Solo se scegli «Dal vivo» il browser chiede il permesso di usare la posizione. Se lo dai, le coordinate vengono arrotondate a un decimale di grado (circa 10 km) e inviate dal tuo browser ad api.met.no, il servizio dell'Istituto meteorologico norvegese (MET Norway), per leggere il tempo che fa; come per ogni richiesta web, MET Norway riceve anche l'indirizzo IP da cui parte. Se neghi il permesso si usano le coordinate di Taranto. Questo sito non riceve e non salva la posizione: resta nella memoria della pagina finché è aperta, e nel browser si conserva solo la modalità scelta. La luce è calcolata sul tuo dispositivo dall'ora. Nelle modalità scura e chiara, e in tutte le altre pagine, non parte nessuna chiamata verso servizi esterni.</p>
 
 <h2>A chi comunico i dati</h2>
-<p>OVHcloud (hosting, UE) e Stripe (pagamenti) come fornitori. Per le spedizioni, il corriere scelto riceve nome, indirizzo e recapito. Nessun dato viene venduto o ceduto per marketing.</p>
+<p>GitHub (hosting del sito, Stati Uniti), OVHcloud (dominio e posta elettronica, UE) e Stripe (pagamenti) come fornitori. Per le spedizioni, il corriere scelto riceve nome, indirizzo e recapito. Nessun dato viene venduto o ceduto per marketing.</p>
 
 <h2>I tuoi diritti</h2>
 <p>Puoi chiedere accesso, rettifica, cancellazione, limitazione, portabilità e opporti al trattamento scrivendo a <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>. Puoi anche presentare reclamo al Garante per la protezione dei dati personali (<a href="https://www.garanteprivacy.it">garanteprivacy.it</a>).</p>
@@ -78,7 +87,7 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">Consulenza IT e AI, stampa 3D e laser, strumenti musicali elettronici e formazione, da Taranto.</p>
+      <p class="muted">Consulenza IT e AI, sviluppo software, modellazione e stampa 3D, taglio laser, strumenti elettronici e formazione. Taranto.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
@@ -93,6 +102,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181701" defer></script>
+<script src="/assets/site.js?v=202611181759" defer></script>
 </body>
 </html>

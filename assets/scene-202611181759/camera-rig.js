@@ -1,9 +1,13 @@
-// Camera: vola tra le viste (1,2 s, easing cubico), segue di poco il mouse (max ±2°)
-// e sposta l'inquadratura a sinistra quando a destra c'e' il pannello.
+// Camera: vola tra le viste (1,2 s, easing cubico) e sposta l'inquadratura quando a sinistra c'e' la scheda.
+// Muovere il mouse non sposta nulla. L'inquadratura si cambia a mano: trascinando si gira intorno al punto
+// guardato (drag), con la rotella ci si avvicina o allontana (zoomBy). Ogni cambio di vista la rimette a posto.
 import * as THREE from "three";
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const MAX_PARALLAX = THREE.MathUtils.degToRad(2);
+const RAD = THREE.MathUtils.degToRad;
+const clamp = THREE.MathUtils.clamp;
+const LIMIT = { yaw: RAD(20), up: RAD(16), down: RAD(9), near: 0.55, far: 1.2 };   // quanto ci si puo' spostare dalla vista
+const ROOM = { x0: -1.42, x1: 1.14, y0: 0.9, y1: 2.45 };                           // la camera resta dentro la stanza
 
 export class CameraRig {
   constructor(camera, views, { reducedMotion = false } = {}) {
@@ -15,8 +19,8 @@ export class CameraRig {
     this.fov = views.overview.fov || camera.fov;
     this.shift = 0;            // frazione della larghezza (0 = centro)
     this.anim = null;
-    this.pointer = new THREE.Vector2();
-    this.smooth = new THREE.Vector2();
+    this.orbit = { yaw: 0, pitch: 0, zoom: 1 };     // spostamento a mano rispetto alla vista
+    this.orbitTo = { yaw: 0, pitch: 0, zoom: 1 };
     this.current = "overview";
     this.size = { w: 1, h: 1 };
     this._dir = new THREE.Vector3();
@@ -26,12 +30,21 @@ export class CameraRig {
   }
 
   setSize(w, h) { this.size.w = w; this.size.h = h; }
-  setPointer(nx, ny) { this.pointer.set(nx, ny); }
+  // trascinamento: dx e dy in pixel. La scena segue la mano: trascinando a destra la camera gira a sinistra.
+  drag(dx, dy) {
+    this.orbitTo.yaw = clamp(this.orbitTo.yaw - dx * RAD(0.13), -LIMIT.yaw, LIMIT.yaw);
+    this.orbitTo.pitch = clamp(this.orbitTo.pitch + dy * RAD(0.11), -LIMIT.down, LIMIT.up);
+  }
+  // rotella: delta positivo allontana
+  zoomBy(delta) { this.orbitTo.zoom = clamp(this.orbitTo.zoom * Math.exp(delta * 0.0011), LIMIT.near, LIMIT.far); }
+  resetOrbit() { this.orbitTo.yaw = 0; this.orbitTo.pitch = 0; this.orbitTo.zoom = 1; }
+  get orbited() { return Math.abs(this.orbitTo.yaw) + Math.abs(this.orbitTo.pitch) + Math.abs(this.orbitTo.zoom - 1) > 1e-3; }
 
   go(name, { shift = 0, instant = false } = {}) {
     const v = this.views[name];
     if (!v) return Promise.resolve();
     this.current = name;
+    this.resetOrbit();
     const from = { pos: this.pos.clone(), target: this.target.clone(), fov: this.fov, shift: this.shift };
     const to = { pos: v.pos.clone(), target: v.target.clone(), fov: v.fov || from.fov, shift };
     if (this.anim) this.anim.resolve();
@@ -67,21 +80,19 @@ export class CameraRig {
       this.shift = this.reduced ? this._shiftTo : THREE.MathUtils.damp(this.shift, this._shiftTo, 6, dt);
     }
 
-    // parallasse: ruota appena la direzione di vista verso il mouse
-    const k = this.reduced ? 1 : 1 - Math.exp(-dt * 3.5);
-    this.smooth.lerp(this.pointer, k);
+    // spostamento a mano: si gira intorno al punto guardato, restando dentro la stanza
+    const o = this.orbit, to = this.orbitTo, k = this.reduced ? 1 : 1 - Math.exp(-dt * 10);
+    o.yaw += (to.yaw - o.yaw) * k; o.pitch += (to.pitch - o.pitch) * k; o.zoom += (to.zoom - o.zoom) * k;
     const cam = this.camera;
-    cam.position.copy(this.pos);
-    this._dir.subVectors(this.target, this.pos);
-    const dist = this._dir.length();
-    this._dir.normalize();
-    this._right.crossVectors(this._dir, THREE.Object3D.DEFAULT_UP).normalize();
-    this._up.crossVectors(this._right, this._dir).normalize();
-    const amt = Math.tan(MAX_PARALLAX) * dist;
-    this._look.copy(this.target)
-      .addScaledVector(this._right, this.smooth.x * amt)
-      .addScaledVector(this._up, this.smooth.y * amt);
-    cam.lookAt(this._look);
+    this._dir.subVectors(this.pos, this.target);               // dal punto guardato alla camera
+    const len = this._dir.length(), dist = len * o.zoom;
+    const yaw = Math.atan2(this._dir.x, this._dir.z) + o.yaw;
+    const pitch = clamp(Math.asin(this._dir.y / len) + o.pitch, RAD(2), RAD(80));
+    cam.position.set(
+      clamp(this.target.x + dist * Math.cos(pitch) * Math.sin(yaw), ROOM.x0, ROOM.x1),
+      clamp(this.target.y + dist * Math.sin(pitch), ROOM.y0, ROOM.y1),
+      this.target.z + dist * Math.cos(pitch) * Math.cos(yaw));
+    cam.lookAt(this.target);
     // a parita' di inquadratura orizzontale: sugli schermi meno larghi si allarga il campo verticale
     const aspect = this.size.w / this.size.h;
     let fov = this.fov;

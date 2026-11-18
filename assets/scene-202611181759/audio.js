@@ -198,7 +198,7 @@ export class SceneAudio {
     if (!this.enabled || !this.init()) return;
     if (this.ctx.state === "suspended") this.ctx.resume();
     const t = this.ctx.currentTime + 0.05;
-    ({ ichosynth: () => this.stepPattern(t), "ichosynth-mini": () => this.granular(t), "open-orc": () => this.chord(t), stame: () => this.drone(t) }[slug] || (() => {}))();
+    ({ ichosynth: () => this.stepPattern(t), "open-orc": () => this.chord(t), stame: () => this.drone(t) }[slug] || (() => {}))();
   }
 
   env(g, t, a, peak, d) {
@@ -235,38 +235,6 @@ export class SceneAudio {
         this.env(g, t, 0.004, 0.12, 0.16);
         o.connect(f).connect(g).connect(this.bus); o.start(t); o.stop(t + 0.2);
       }
-    }
-  }
-
-  // Ichosynth Mini: un campione (qui generato) suonato a grani
-  granular(t0) {
-    const ctx = this.ctx, sr = ctx.sampleRate, len = sr * 0.8;
-    if (!this.sample) {
-      // "campione": accordo vocale con formanti e un po' di fruscio, come registrato da un microfono
-      this.sample = ctx.createBuffer(1, len, sr);
-      const d = this.sample.getChannelData(0);
-      const fs = [220, 277.2, 329.6, 440];
-      for (let i = 0; i < len; i++) {
-        const tt = i / sr;
-        let v = 0;
-        for (const f of fs) v += Math.sin(2 * Math.PI * f * tt + Math.sin(2 * Math.PI * 5 * tt) * 0.6) * 0.22;
-        v += (Math.random() * 2 - 1) * 0.04;
-        d[i] = v * Math.min(1, tt * 20) * Math.exp(-tt * 1.5);
-      }
-    }
-    for (let i = 0; i < 46; i++) {
-      const t = t0 + i * 0.045 + Math.random() * 0.02;
-      const s = ctx.createBufferSource(), g = ctx.createGain(), p = ctx.createStereoPanner();
-      s.buffer = this.sample;
-      s.playbackRate.value = [1, 1.5, 0.75, 2][Math.floor(Math.random() * 4)] * (1 + (Math.random() - 0.5) * 0.01);
-      p.pan.value = Math.random() * 1.6 - 0.8;
-      const dur = 0.06 + Math.random() * 0.08;
-      const fadeOut = 1 - i / 46;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.18 * fadeOut + 0.03, t + dur / 2);
-      g.gain.linearRampToValueAtTime(0, t + dur);
-      s.connect(g).connect(p).connect(this.bus);
-      s.start(t, Math.random() * 0.6, dur);
     }
   }
 

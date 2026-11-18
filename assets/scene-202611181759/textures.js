@@ -161,7 +161,7 @@ const CODE_FILES = [
   {
     name: "sequencer.js",
     lang: "js",
-    text: `// sequencer.js — scheduler a 8 step per Ichosynth Mini
+    text: `// sequencer.js — scheduler a otto passi
 const NOTE = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33];
 
 export function creaSequencer(ctx, uscita) {

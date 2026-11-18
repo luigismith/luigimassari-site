@@ -344,7 +344,20 @@ a:hover { color: var(--segnale); }
 .hero-media .hero-light { display: none; }
 :root[data-theme="light"] .hero-media .hero-light { display: block; }
 :root[data-theme="light"] .hero-media .hero-dark { display: none; }
-.theme-toggle { font: inherit; font-size: 14px; font-weight: 600; font-stretch: 88%; background: transparent; cursor: pointer; }
+/* Scelta del tema nell'intestazione: un menu a tre voci (scuro, chiaro, dal vivo) con l'aspetto del selettore della lingua */
+.theme-select { flex: none; display: inline-flex; }
+.theme-select select {
+  font: inherit; font-size: 14px; font-weight: 600; font-stretch: 88%; cursor: pointer;
+  appearance: none; -webkit-appearance: none; padding-right: 26px; background-color: transparent;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 54%, calc(100% - 10px) 54%; background-size: 4px 4px; background-repeat: no-repeat;
+}
+.theme-select option { background: var(--notte); color: var(--serigrafia); }
+@media (max-width: 480px) { /* su telefono marchio, tema e lingua devono stare su una riga */
+  .theme-select select { padding-left: 8px; padding-right: 19px; background-position: calc(100% - 10px) 54%, calc(100% - 6px) 54%; }
+  .site-header .lang { padding-left: 8px; padding-right: 8px; }
+  .theme-select select.lang { padding-right: 19px; }
+}
 html, body { background: var(--notte); color: var(--fg); }
 a:hover, .theme-dark a:hover { color: var(--accent); }
 :focus-visible, .theme-dark :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 0; }
@@ -525,3 +538,18 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
     linear-gradient(90deg, rgb(var(--veil) / .97) 0%, rgb(var(--veil) / .93) 46%, rgb(var(--veil) / .4) 78%, rgb(var(--veil) / 0) 100%),
     linear-gradient(0deg, rgb(var(--veil) / .85) 0%, rgb(var(--veil) / 0) 30%);
 }
+
+/* --- Offerta ristrutturata (2026-11-18): proposte in griglia, metodo numerato, tre strumenti in fila --- */
+.offers { list-style: none; margin: 0 0 var(--s7); padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s6); }
+.offers li { border-top: 2px solid var(--sodio); padding-top: var(--s4); }
+.offers .h3 { margin: 0 0 var(--s3); }
+.offers p { margin: 0; color: var(--muted); font-size: 16px; }
+.rows-num { counter-reset: passo; }
+.rows-num li { counter-increment: passo; }
+.rows-num .h3::before { content: counter(passo) ". "; color: var(--accent); }
+.proof-side .label { margin-top: var(--s7); }
+.proof-side .label:first-child { margin-top: 0; }
+.status-aperto::before { background: var(--sodio); }
+@media (min-width: 861px) { .instruments { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 980px) { .offers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .offers { grid-template-columns: 1fr; } }

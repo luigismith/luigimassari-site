@@ -24,7 +24,10 @@ precision highp float;
 uniform float uTime;
 uniform vec2 uSize;
 uniform float uRain;
-uniform float uDay;   // 0 = notte (tema scuro), 1 = giorno (tema chiaro)
+uniform float uDay;   // 0 = notte (tema scuro), 1 = giorno (tema chiaro); in mezzo il crepuscolo (solo "dal vivo")
+uniform float uCloud; // nuvolosita': 0 sereno, 1 coperto. Tema scuro 0.66, tema chiaro 1 (i cieli di sempre)
+uniform float uDusk;  // 0..1: quanto l'orizzonte si scalda all'alba e al tramonto (0 nei temi scuro e chiaro)
+uniform float uAlpha; // opacita': 1, tranne che per il panorama di giorno sovrapposto a quello di notte al crepuscolo
 varying vec2 vUv;
 varying vec3 vWorld;
 
@@ -118,9 +121,18 @@ vec3 sky(float az, float el, float t) {
   vec3 col = mix(vec3(0.018, 0.024, 0.045), vec3(0.006, 0.009, 0.020), smoothstep(0.0, 0.35, h));
   // bagliore della citta' sotto le nubi
   col += vec3(0.075, 0.034, 0.05) * exp(-h / 0.06);
-  // nubi basse che scorrono piano
+  // stelle, solo con il cielo quasi sereno (nel tema scuro non ci sono)
+  float clearSky = 1.0 - smoothstep(0.0, 0.5, uCloud);
+  if (clearSky > 0.0) {
+    vec2 sg = vec2(az, el) * 260.0;
+    vec2 si = floor(sg);
+    vec2 sp = fract(sg) - 0.5 - (h22(si) - 0.5) * 0.6;
+    col += vec3(0.75, 0.80, 1.0) * step(0.93, h21(si + 3.0)) * exp(-dot(sp, sp) / 0.012) * (0.25 + 0.75 * h21(si + 9.0)) * clearSky * smoothstep(0.02, 0.2, h);
+  }
+  // nubi basse che scorrono piano: piu' uCloud e' alto, piu' cielo coprono (con 0.66 la soglia e' 0.42, quella di sempre)
+  float lo = 0.75 - 0.5 * uCloud;
   float c = fbm(vec2(az * 3.2 - t * 0.012, el * 9.0 + 2.0));
-  c = smoothstep(0.42, 0.78, c);
+  c = smoothstep(lo, lo + 0.36, c);
   vec3 cloud = mix(vec3(0.03, 0.034, 0.055), vec3(0.12, 0.06, 0.085), exp(-h / 0.1));
   col = mix(col, cloud, c * 0.85);
   return col;
@@ -286,9 +298,18 @@ vec3 outside(vec3 dir, float blur, float t) {
 // --- lo stesso panorama di giorno, con cielo coperto ---
 vec3 daySky(float az, float el, float t) {
   float h = max(el - HOR, 0.0);
-  vec3 col = mix(vec3(0.60, 0.65, 0.69), vec3(0.34, 0.44, 0.58), smoothstep(0.0, 0.45, h));
   float c = fbm(vec2(az * 3.2 - t * 0.012, el * 9.0 + 2.0));
-  return mix(col, vec3(0.72, 0.74, 0.76), smoothstep(0.42, 0.78, c) * 0.7);
+  // coperto: il cielo di sempre del tema chiaro
+  vec3 col = mix(vec3(0.60, 0.65, 0.69), vec3(0.34, 0.44, 0.58), smoothstep(0.0, 0.45, h));
+  col = mix(col, vec3(0.72, 0.74, 0.76), smoothstep(0.42, 0.78, c) * 0.7);
+  if (uCloud < 0.995) {
+    // sereno: azzurro, piu' chiaro verso l'orizzonte, con le nubi bianche che il meteo dichiara
+    vec3 blue = mix(vec3(0.40, 0.60, 0.86), vec3(0.06, 0.22, 0.58), smoothstep(0.0, 0.45, h));   // valori saturi: la resa finale li schiarisce
+    float lo = mix(0.80, 0.34, uCloud);
+    blue = mix(blue, vec3(0.96, 0.97, 0.98), smoothstep(lo, lo + 0.22, c) * 0.9);
+    col = mix(blue, col, smoothstep(0.55, 1.0, uCloud));
+  }
+  return col;
 }
 vec3 townDay(float u, float y) {
   // case chiare con le file di finestre
@@ -309,7 +330,7 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     vec2 wp = vec2(az / dep, 1.0 / dep);
     float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
     col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
-    col = mix(col, daySky(az, HOR + dep, t), 0.25);
+    col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud));   // con il sereno l'acqua prende l'azzurro del cielo
     float u = townU(az) + rip * 0.25;                            // riflesso scuro del ponte e chiaro del castello
     if (abs(u) < 1.0) col *= 1.0 - 0.28 * smoothstep(bridgeUnder(u) - 0.004, bridgeUnder(u), dep) * (1.0 - smoothstep(DECK, DECK + 0.006, dep));
     if (inCastle(u)) col = mix(col, vec3(0.50, 0.47, 0.42), 0.22 * exp(-dep / 0.03));
@@ -318,7 +339,7 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float ce = skyline(az);
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
-    vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR));
+    vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR)) * (1.0 + 0.22 * (1.0 - uCloud));
     if (abs(u) < 3.1) hill = mix(hill, mix(townDay(u, y), daySky(az, HOR + 0.02, t), 0.42), townK(u));   // velati dalla distanza
     col = mix(daySky(az, el, t), hill, land);
     if (abs(u) < 1.4) {                                          // ponte girevole: acciaio grigio azzurro, parapetto e lampioni
@@ -351,7 +372,7 @@ vec3 slidingDrops(vec2 p, float t, float scale) {
   float ph = fract(t * speed + h21(id + 4.7));
   float y = 0.95 - ph * 0.9 + 0.035 * sin(ph * 31.0 + hs * 6.0);  // scende a scatti
   float x = 0.5 + (hs - 0.5) * 0.45 + 0.05 * sin(y * 9.0 + hs * 20.0);
-  float present = step(0.35, h21(id + 1.3));
+  float present = step(mix(0.80, 0.35, uRain), h21(id + 1.3));   // con la pioggia debole scendono meno gocce
   float fade = smoothstep(0.0, 0.06, ph) * (1.0 - smoothstep(0.88, 1.0, ph));
   vec2 asp = vec2(1.0, cellSize.y / cellSize.x);
   vec2 d = (f - vec2(x, y)) * asp;
@@ -380,32 +401,42 @@ vec3 staticDrops(vec2 p, float t) {
   float life = fract(t * 0.07 + h21(id + 9.1));
   float r = (0.12 + rnd.x * 0.22) * smoothstep(1.0, 0.75, life) * smoothstep(0.0, 0.05, life);
   vec2 d = f - (rnd - 0.5) * 0.5;
-  float m = smoothstep(r, r * 0.6, length(d)) * step(0.87, h21(id + 2.2));
+  float m = smoothstep(r, r * 0.6, length(d)) * step(mix(0.965, 0.87, uRain), h21(id + 2.2));
   return vec3(d / max(r, 1e-3) * m * 0.012, m);
 }
 
 void main() {
   vec2 p = vUv * uSize;
   float t = uTime;
-  vec3 a = slidingDrops(p, t, 1.0);
-  vec3 b = slidingDrops(p + vec2(0.37, 0.11), t * 0.8, 0.72);
-  vec3 s = staticDrops(p, t);
-  vec2 off = (a.xy + b.xy + s.xy) * uRain;
-  float clear = clamp(max(max(a.z, b.z), s.z) * uRain, 0.0, 1.0);
+  // uRain: 0 vetro asciutto, 0.5 pioggia debole, 1 pioggia (i temi scuro e chiaro usano sempre 1)
+  float wet = clamp(uRain * 2.0, 0.0, 1.0);      // quanto il vetro e' bagnato: pieno gia' con la pioggia debole
+  vec3 a = vec3(0.0), b = vec3(0.0), s = vec3(0.0);
+  if (uRain > 0.001) {
+    a = slidingDrops(p, t, 1.0);
+    b = slidingDrops(p + vec2(0.37, 0.11), t * 0.8, 0.72);
+    s = staticDrops(p, t);
+  }
+  vec2 off = (a.xy + b.xy + s.xy) * wet;
+  float clear = clamp(max(max(a.z, b.z), s.z) * wet, 0.0, 1.0);
 
   vec3 dir = normalize(vWorld - cameraPosition);
   // le gocce fanno da lenti: deviano (e capovolgono) la vista
   dir = normalize(dir - vec3(off.x * 9.0, off.y * 9.0, 0.0));
-  float blur = mix(1.0, 0.15, clear);
-  // MODE: 0 = notte, 1 = giorno: due varianti dello shader, ogni tema calcola solo il suo panorama
+  float blur = mix(0.15, mix(1.0, 0.15, clear), wet);   // vetro asciutto: si vede nitido come dentro una goccia
+  // MODE: 0 = notte, 1 = giorno: due varianti dello shader, ognuna calcola solo il suo panorama.
+  // Al crepuscolo (solo nella modalita' "dal vivo") si disegnano tutte e due: il giorno sopra la notte, con uAlpha.
 #if MODE == 0
   vec3 col = outside(dir, blur, t);
 #else
   vec3 col = dayOutside(dir, blur, t);
 #endif
+  if (uDusk > 0.001) {                                                    // alba e tramonto: l'orizzonte si scalda
+    float tel = asin(clamp(dir.y, -1.0, 1.0)) - HOR;
+    col += vec3(0.95, 0.42, 0.16) * exp(-abs(tel) / 0.09) * uDusk * (0.55 - 0.3 * uCloud) * (tel > 0.0 ? 1.0 : 0.45);
+  }
 
   // vetro appannato: foschia fredda dove non passano gocce
-  float fog = 0.32 * (1.0 - clear) * uRain;
+  float fog = 0.32 * (1.0 - clear) * wet;
   vec3 fogCol = mix(vec3(0.016, 0.020, 0.028), vec3(0.30, 0.33, 0.35), uDay) + col * 0.4;
   col = mix(col, fogCol, fog);
   // bordo delle gocce: leggero scuro + riflesso della lampada in alto a sinistra
@@ -413,16 +444,29 @@ void main() {
   col *= 1.0 - 0.12 * rim;
   col += vec3(0.20, 0.13, 0.07) * smoothstep(0.6, 1.0, dot(normalize(off + 1e-5), normalize(vec2(-0.6, 0.8)))) * rim * 0.5;
   col += vec3(0.010, 0.007, 0.004) * (1.0 - vUv.y);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, uAlpha);
 }`;
 
 export function createGlass() {
   const w = ROOM.win.x1 - ROOM.win.x0, h = ROOM.win.y1 - ROOM.win.y0;
-  // due varianti dello stesso shader con le stesse uniform: notte e giorno
-  const uniforms = { uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 } };
-  const variants = [0, 1].map((MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms, defines: { MODE } }));
+  // Due varianti dello stesso shader (notte e giorno) con le stesse uniform, piu' un terzo materiale che riusa
+  // il programma del giorno: e' il panorama diurno che al crepuscolo si sovrappone, in trasparenza, a quello notturno.
+  // Tutti "transparent" (con opacita' 1 non cambia nulla): cosi' il terzo non richiede un programma in piu'.
+  // Una terza variante che mescolasse i due panorami nello stesso shader e' stata provata e scartata: al primo
+  // uso bloccava la pagina per 7-8 secondi (compilazione), e prepararla prima con compileAsync non serviva.
+  const shared = { uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 } };
+  const material = (MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms: { ...shared, uAlpha: { value: 1 } }, defines: { MODE }, transparent: true });
+  const variants = [0, 1].map(material);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), variants[0]);
+  mesh.renderOrder = -2; // la vetrata e' la cosa piu' lontana: si disegna prima di ogni altra trasparenza
   mesh.userData.variants = variants;
+  const over = new THREE.Mesh(mesh.geometry, material(1));
+  over.name = "glass-day";
+  over.position.z = 0.0008;
+  over.renderOrder = -1;
+  over.visible = false;
+  mesh.add(over);
+  mesh.userData.over = over;
   mesh.position.set((ROOM.win.x0 + ROOM.win.x1) / 2, (ROOM.win.y0 + ROOM.win.y1) / 2, ROOM.glassZ);
   mesh.name = "glass";
   return mesh;
@@ -431,6 +475,7 @@ export function createGlass() {
 const C3 = (hex) => new THREE.Color(hex);
 const NIGHT = { moon: C3(0x5f86d8), sky: C3(0x2c3466), ground: C3(0x0b0710), floor: C3(0x17130f), ceil: C3(0x1d2026) };
 const DAY = { moon: C3(0xfff3e2), sky: C3(0xd5dee8), ground: C3(0x8f887b), floor: C3(0x6b6156), ceil: C3(0xc4c9cc) };
+const DUSK = C3(0xff9a52); // luce radente di alba e tramonto
 
 export function createRoom(ctx) {
   const { ui } = ctx;
@@ -517,16 +562,23 @@ export function createRoom(ctx) {
   return {
     group,
     glass,
-    // k: 0 = notte, 1 = giorno. Di giorno entra luce chiara dalla vetrata e le pareti schiariscono.
-    setDay(k) {
-      const L = THREE.MathUtils.lerp;
-      glass.material = glass.userData.variants[k < 0.5 ? 0 : 1];
-      glass.material.uniforms.uDay.value = k;
-      moon.color.lerpColors(NIGHT.moon, DAY.moon, k);
-      moon.intensity = L(0.6, 1.4, k);
+    // day: 0 = notte, 1 = giorno (di giorno entra luce chiara dalla vetrata e le pareti schiariscono).
+    // rain: 0 vetro asciutto .. 1 pioggia. cloud: 0 sereno .. 1 coperto. warm: 0..1, alba e tramonto.
+    // Tema scuro = { day 0, rain 1, cloud 0.66 }, tema chiaro = { day 1, rain 1, cloud 1 }: sono i due aspetti di sempre.
+    setSky({ day: k, rain = 1, cloud = 1, warm = 0 }) {
+      const L = THREE.MathUtils.lerp, open = (1 - cloud) * k;   // quanto cielo sereno si vede, di giorno
+      // notte o giorno pieni: una sola variante. In mezzo (crepuscolo): la notte sotto e il giorno sopra, opaco quanto k
+      const twilight = k > 0.02 && k < 0.98, over = glass.userData.over;
+      glass.material = glass.userData.variants[k >= 0.98 ? 1 : 0];
+      over.visible = twilight;
+      over.material.uniforms.uAlpha.value = k;
+      const u = glass.material.uniforms;
+      u.uDay.value = k; u.uRain.value = rain; u.uCloud.value = cloud; u.uDusk.value = twilight ? warm : 0;
+      moon.color.lerpColors(NIGHT.moon, DAY.moon, k).lerp(DUSK, warm * 0.6);
+      moon.intensity = L(0.6, 1.4, k) * (1 + 0.6 * open);
       fill.color.lerpColors(NIGHT.sky, DAY.sky, k);
       fill.groundColor.lerpColors(NIGHT.ground, DAY.ground, k);
-      fill.intensity = L(0.62, 1.9, k);
+      fill.intensity = L(0.62, 1.9, k) * (1 + 0.12 * open);
       wallMat.color.setScalar(L(1, 3.3, k));
       floorMat.color.lerpColors(NIGHT.floor, DAY.floor, k);
       ceilMat.color.lerpColors(NIGHT.ceil, DAY.ceil, k);

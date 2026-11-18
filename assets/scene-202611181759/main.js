@@ -14,6 +14,7 @@ import { CameraRig } from "./camera-rig.js";
 import { setAnisotropy } from "./textures.js";
 import { UI } from "./ui.js";
 import { SceneAudio } from "./audio.js";
+import { LiveMode } from "./live.js";
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
@@ -124,31 +125,65 @@ export async function start({ data, root, force, toLofi }) {
   const finish = new ShaderPass(FinishShader);
   composer.addPass(finish);
 
-  // --- tema: scuro = notte (la luce di sempre), chiaro = giorno ---
-  let day = document.documentElement.dataset.theme === "light" ? 1 : 0;
+  // --- tema: scuro = notte (la luce di sempre), chiaro = giorno coperto, "dal vivo" = sole e meteo veri ---
+  // Un "aspetto" e' { day, rain, cloud, warm } (vedi room.setSky). I due temi fissi sono due aspetti costanti;
+  // nella modalita' "dal vivo" l'aspetto arriva da live.js, che calcola il sole e legge il meteo.
+  const html = document.documentElement;
+  const FIXED = { dark: { day: 0, rain: 1, cloud: 0.66, warm: 0 }, light: { day: 1, rain: 1, cloud: 1, warm: 0 } };
+  const themeMode = () => (html.dataset.themeMode === "live" ? "live" : html.dataset.theme === "light" ? "light" : "dark");
   const BG_NIGHT = new THREE.Color(0x050608), BG_DAY = new THREE.Color(0xdfe3e0);
-  function applyDay(k) {
-    const L = THREE.MathUtils.lerp;
-    room.setDay(k);
+  let look = null, rendered = false, fadeTimer = 0, fadeTo = null;
+  function applyLook(s) {
+    look = s;
+    const L = THREE.MathUtils.lerp, k = s.day;
+    room.setSky(s);
     renderer.toneMappingExposure = L(1.45, 1.0, k);
     bloom.strength = L(0.72, 0.25, k);
     bloom.threshold = L(1.35, 2.2, k);
     finish.uniforms.uVig.value = L(0.5, 0.86, k);
     lamp.spot.intensity = L(1.7, 1.0, k);
     scene.background.lerpColors(BG_NIGHT, BG_DAY, k);
+    // "dal vivo": anche le scritte sopra la scena passano al chiaro quando fuori e' giorno
+    if (themeMode() === "live") { if (k > 0.5) html.dataset.theme = "light"; else delete html.dataset.theme; }
   }
-  applyDay(day);
-  // al cambio tema la scena sfuma un attimo, cambia luce e riappare (cosi' non si vede lo scatto)
-  window.addEventListener("lm-theme", (e) => {
-    const k = e.detail === "light" ? 1 : 0;
-    if (k === day) return;
-    day = k;
-    if (reduced) { applyDay(day); return; }
+  // cambio netto (tema, arrivo del meteo): la scena sfuma un attimo, cambia e riappare, cosi' non si vede lo scatto
+  function fadeLook(s) {
+    if (reduced || !rendered || root.hidden) { applyLook(s); return; }
+    fadeTo = s;
+    if (fadeTimer) return;
     root.classList.add("is-switching");
-    setTimeout(() => {
-      applyDay(day);
+    fadeTimer = setTimeout(() => {
+      fadeTimer = 0;
+      applyLook(fadeTo);
       requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("is-switching")));
     }, 260);
+  }
+  // in ?debug l'orologio si puo' fissare (window.__lmNow = istante in millisecondi o data ISO): serve alle verifiche
+  const clock = () => (debug && window.__lmNow ? new Date(window.__lmNow) : new Date());
+  let spoken = "";
+  const live = new LiveMode({
+    clock,
+    onChange(s) {
+      const text = ui.setWeather(s), key = s.kind + "|" + s.temp + "|" + s.where;
+      if (s.weather === "ok" && key !== spoken) { spoken = key; ui.announce(text); } // si annuncia quando cambia il tempo, non a ogni minuto
+      const jump = !look || Math.abs(look.day - s.day) > 0.12 || Math.abs(look.rain - s.rain) > 0.2 || Math.abs(look.cloud - s.cloud) > 0.3;
+      if (jump) fadeLook(s); else if (fadeTimer) fadeTo = s; else applyLook(s);
+    },
+  });
+  function setTheme(mode, { ask = false } = {}) {
+    if (mode === "live") { live.start({ ask }); return; }
+    live.stop();
+    spoken = "";
+    ui.setWeather(null);
+    const next = FIXED[mode];
+    if (look !== next) fadeLook(next);
+  }
+  setTheme(themeMode());
+  // la scelta del visitatore arriva da site.js; solo qui, e solo per "dal vivo", il browser puo' chiedere la posizione
+  let themeDirty = false;
+  window.addEventListener("lm-theme", (e) => {
+    if (root.hidden) { themeDirty = true; return; } // scena nascosta (versione classica): si applica al rientro, senza chiedere nulla
+    setTheme(e.detail === "live" || e.detail === "light" ? e.detail : "dark", { ask: true });
   });
 
   function resize() {
@@ -279,23 +314,36 @@ export async function start({ data, root, force, toLofi }) {
   ui.on("sound", setSound);
   ui.bindControls();
 
-  // --- puntatore: parallasse, hover, clic ---
+  // --- puntatore: hover e clic; l'inquadratura si sposta solo trascinando o con la rotella ---
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  let pointerDirty = false, pointerIn = false, downAt = null;
+  let pointerDirty = false, pointerIn = false, downAt = null, lastAt = null, dragging = false;
   const canvas = renderer.domElement;
-  window.addEventListener("pointermove", (e) => {
-    rig.setPointer((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1));
-  });
+  const endDrag = () => { lastAt = null; if (dragging) { dragging = false; root.classList.remove("is-dragging"); pointerDirty = true; } };
   canvas.addEventListener("pointermove", (e) => {
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     pointerDirty = true; pointerIn = true;
+    if (!lastAt || !state.entered) return;
+    // oltre sei pixel dal punto di partenza e' un trascinamento, non un clic
+    if (!dragging && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) { dragging = true; root.classList.add("is-dragging"); setHover(null); }
+    if (dragging) rig.drag(e.clientX - lastAt[0], e.clientY - lastAt[1]);
+    lastAt = [e.clientX, e.clientY];
   });
   canvas.addEventListener("pointerleave", () => { pointerIn = false; setHover(null); });
-  canvas.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    downAt = lastAt = [e.clientX, e.clientY];
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* puntatore non catturabile */ }
+  });
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("lostpointercapture", endDrag);
+  canvas.addEventListener("wheel", (e) => { if (!state.entered) return; e.preventDefault(); rig.zoomBy(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: false });
+  canvas.addEventListener("dblclick", () => { if (!state.hover) rig.resetOrbit(); });   // doppio clic nel vuoto: l'inquadratura torna a posto
   canvas.addEventListener("pointerup", (e) => {
-    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+    const wasDrag = dragging;
+    endDrag();
+    if (wasDrag || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) { downAt = null; return; }
     downAt = null;
     const hit = state.hover;
     if (!hit || !state.entered) return;
@@ -320,7 +368,7 @@ export async function start({ data, root, force, toLofi }) {
   }
   const tmp = new THREE.Vector3();
   function updateHover() {
-    if (!state.entered || rig.moving) { if (state.hover) setHover(null); return; }
+    if (!state.entered || rig.moving || dragging) { if (state.hover) setHover(null); return; }
     if (pointerDirty && pointerIn) {
       ray.setFromCamera(ndc, camera);
       const hit = ray.intersectObjects(hits, false)[0];
@@ -353,6 +401,7 @@ export async function start({ data, root, force, toLofi }) {
   let shadowFrames = 4;
   const refreshShadows = () => { shadowFrames = 4; };
   function frame(time) {
+    rendered = true;
     if (shadowFrames > 0) { renderer.shadowMap.needsUpdate = true; shadowFrames--; }
     timer.update(time);
     const dt = Math.min(timer.getDelta(), 0.1);
@@ -390,6 +439,7 @@ export async function start({ data, root, force, toLofi }) {
     const visible = !document.hidden && !root.hidden;
     run(visible);
     audio.setVisible(visible);
+    if (visible) live.resume(); else live.pause();
   });
 
   // primo secondo di render: sotto i 30 fps si passa da soli alla versione Lo-Fi
@@ -407,12 +457,15 @@ export async function start({ data, root, force, toLofi }) {
   let firstFps = await measureFirstSecond();
   if (firstFps < 30 && !force) firstFps = Math.max(firstFps, await measureFirstSecond());
   const api = {
-    pause() { run(false); audio.setVisible(false); },
-    resume() { run(true); audio.setVisible(true); },
+    pause() { run(false); audio.setVisible(false); live.pause(); },
+    resume() {
+      run(true); audio.setVisible(true);
+      if (themeDirty) { themeDirty = false; setTheme(themeMode()); } else live.resume(); // tema cambiato dalla versione classica
+    },
     get fps() { return fps.value; },
     firstFps,
   };
-  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio, refreshShadows };
+  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio, refreshShadows, live, get look() { return look; } };
   if (firstFps < 30 && !force) {
     run(false);
     toLofi({ auto: true, message: data.ui.too_slow });

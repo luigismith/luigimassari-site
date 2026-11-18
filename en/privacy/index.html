@@ -19,8 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
-<link rel="stylesheet" href="/assets/site.css?v=202611181701">
+<script>try{var m=localStorage.getItem("lm-theme"),h=new Date().getHours(),d=document.documentElement;if(m==="live")d.dataset.themeMode="live";if(m==="light"||(m==="live"&&h>=7&&h<19))d.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181759">
 
 
 
@@ -33,14 +33,20 @@
     <nav id="nav" class="tuner" aria-label="Site sections" data-tuner>
       <ul>
         <li><a href="/en/consulting/" data-station="dev">IT and AI consulting</a></li>
-        <li><a href="/en/#3d-printing" data-station="print">3D printing and laser</a></li>
-        <li><a href="/en/elettrofoni/" data-station="shop">Instruments</a></li>
+        <li><a href="/en/#3d-printing" data-station="print">3D and laser</a></li>
+        <li><a href="/en/elettrofoni/" data-station="shop">Synths and DIY</a></li>
         <li><a href="/en/#training" data-station="lab">Training</a></li>
         <li><a href="/en/contact/" data-station="contact">Contact</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
-    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Light" data-label-dark="Dark" title="Switch between the dark and the light theme">Light</button>
+    <label class="theme-select"><span class="visually-hidden">Theme</span>
+      <select class="lang" data-theme-select title="Live: in the 3D version light and weather are the real ones where you are (asks for your location); on the other pages the theme follows the time of day">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="live">Live</option>
+      </select>
+    </label>
     <a class="lang" href="/privacy/" hreflang="it" lang="it">Italiano</a>
   </div>
 </header>
@@ -56,15 +62,18 @@
 <p>Luigi Massari, Taranto (TA), Italia. Email: <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>.</p>
 
 <h2>What data I process and why</h2>
-<p><strong>Browsing.</strong> The site is hosted by OVHcloud, which records technical server logs such as IP address, date and requested page, for security and service operation (legitimate interest, Art. 6(1)(f) GDPR). Logs are kept for the period set by the provider.</p>
+<p><strong>Browsing.</strong> The site is hosted on GitHub Pages, a service of GitHub, Inc. (United States), which records technical server logs such as IP address, date and requested page, for security and service operation (legitimate interest, Art. 6(1)(f) GDPR). Logs are kept for the period set by the provider.</p>
 <p><strong>Contact.</strong> If you write to me, I process your name, email and message only to reply and, if asked, prepare a quote (pre-contractual steps, Art. 6(1)(b)). The site's form stores nothing: it opens your email app.</p>
 <p><strong>Purchases.</strong> Payments happen on Stripe, which processes payment data as an independent controller; I receive your name, email, shipping address and order details to fulfil the order and meet tax obligations (Art. 6(1)(b) and 6(1)(c)). I never see or store card details. Order data is kept for 10 years for accounting purposes.</p>
 
 <h2>Cookies</h2>
-<p>This site uses no profiling cookies and no analytics or advertising tools. Fonts are hosted on the site itself, with no calls to external services. At checkout, Stripe may set technical cookies required for payment security.</p>
+<p>This site uses no profiling cookies and no analytics or advertising tools. Fonts are hosted on the site itself. The only call to an external service is the one made by “Live” mode, described below, and it is made only if you choose that mode. At checkout, Stripe may set technical cookies required for payment security.</p>
+
+<h2>“Live” mode</h2>
+<p>The 3D version of the home page has three display modes: dark, light and “Live”. Only if you choose “Live” does your browser ask permission to use your location. If you grant it, the coordinates are rounded to one decimal degree (about 10 km) and sent by your browser to api.met.no, the service of the Norwegian Meteorological Institute (MET Norway), to read the current weather; as with any web request, MET Norway also receives the IP address the request comes from. If you decline, the coordinates of Taranto are used. This site neither receives nor stores your location: it stays in the page's memory while the page is open, and only the chosen mode is kept in your browser. Light is computed on your device from the time of day. In dark and light modes, and on all other pages, no calls are made to external services.</p>
 
 <h2>Who receives the data</h2>
-<p>OVHcloud (hosting, EU) and Stripe (payments) as providers. For shipping, the chosen courier receives name, address and contact details. No data is sold or shared for marketing.</p>
+<p>GitHub (website hosting, United States), OVHcloud (domain and email, EU) and Stripe (payments) as providers. For shipping, the chosen courier receives name, address and contact details. No data is sold or shared for marketing.</p>
 
 <h2>Your rights</h2>
 <p>You can request access, rectification, erasure, restriction, portability and object to processing by writing to <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>. You can also lodge a complaint with the Italian data protection authority (<a href="https://www.garanteprivacy.it">garanteprivacy.it</a>) or your local authority.</p>
@@ -78,7 +87,7 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">IT and AI consulting, 3D printing and laser cutting, electronic musical instruments and training, from Taranto, Italy.</p>
+      <p class="muted">IT and AI consulting, software development, 3D modelling and printing, laser cutting, electronic instruments and training. Taranto, Italy.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
@@ -93,6 +102,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181701" defer></script>
+<script src="/assets/site.js?v=202611181759" defer></script>
 </body>
 </html>

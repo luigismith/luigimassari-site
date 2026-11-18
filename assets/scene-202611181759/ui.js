@@ -33,6 +33,10 @@ export class UI {
     this.panelBody = this.q("[data-scene-panel-body]");
     this.label = this.q("[data-scene-label]");
     this.live = this.q("[data-scene-live]");
+    this.weatherBox = this.q("[data-scene-weather]");
+    this.weatherMain = this.q("[data-scene-weather-main]");
+    this.weatherSub = this.q("[data-scene-weather-sub]");
+    this.weatherCredit = this.q("[data-scene-weather-credit]");
     this.soundBtn = this.q("[data-scene-sound]");
     this.soundLabel = this.q("[data-scene-sound-label]");
     this.langLink = this.q("[data-scene-lang]");
@@ -87,6 +91,21 @@ export class UI {
     this.soundBtn.addEventListener("click", () => this.emit("sound", this.soundBtn.getAttribute("aria-pressed") !== "true"));
     this.q("[data-scene-back]").addEventListener("click", () => this.emit("back"));
     this.q("[data-scene-home]").addEventListener("click", (e) => { e.preventDefault(); this.emit("back"); });
+  }
+
+  // Stato della modalita' "dal vivo": che tempo fa, che ora e' e dove (la zona del visitatore oppure Taranto),
+  // piu' la citazione di MET Norway. Con null il riquadro sparisce. Restituisce il testo, per l'annuncio.
+  setWeather(s) {
+    if (!s) { this.weatherBox.hidden = true; return ""; }
+    const u = this.data.ui, here = s.where === "you";
+    const time = s.date.toLocaleTimeString(document.documentElement.lang || "it", { hour: "2-digit", minute: "2-digit", ...(here ? {} : { timeZone: "Europe/Rome" }) });
+    const main = s.weather === "ok" ? u.live_kinds[s.kind] + (s.temp === null ? "" : ", " + s.temp + " °C") : s.weather === "wait" ? u.live_wait : u.live_none;
+    const sub = (here ? u.live_you : u.live_taranto).replace("{time}", time) + (s.weather === "none" ? " " + u.live_light : "");
+    this.weatherMain.textContent = main;
+    this.weatherSub.textContent = sub;
+    this.weatherCredit.hidden = s.weather === "none";
+    this.weatherBox.hidden = false;
+    return main + ". " + sub;
   }
 
   setSound(on) {
@@ -164,9 +183,6 @@ export class UI {
         h("h3", { class: "sp-h" }, d.services_h),
         h("ul", { class: "sp-list" }, d.services.map((s) => h("li", {}, h("h3", {}, s.h), h("p", {}, s.p))))),
       h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, d.work_h),
-        h("ul", { class: "sp-list" }, d.work.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
-      h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, d.process_h),
         h("ol", { class: "sp-steps" }, d.process.map(([t, p], i) => h("li", {}, h("span", { class: "n", "aria-hidden": "true" }, i + 1), h("h3", {}, t), h("p", {}, p))))),
       h("div", { class: "sp-actions" }, h("a", { class: "btn btn-primary", href: d.cta_href }, d.cta)),
@@ -183,6 +199,9 @@ export class UI {
     const out = [
       this.title(s.h),
       h("p", { class: "lead" }, s.p),
+      h("div", { class: "sp-actions" }, h("a", { class: "btn btn-primary", href: s.cta_href }, s.cta)),
+      h("div", { class: "sp-section" },
+        h("ul", { class: "sp-list" }, s.items.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, s.pick),
         h("ul", { class: "sp-products" }, this.productButtons.map((b) => h("li", {}, b)))),
@@ -207,13 +226,13 @@ export class UI {
       h("p", { class: "status status-" + p.status }, p.status_label),
       h("h3", { id: "sp-card-h", tabindex: "-1" }, p.name),
       h("p", {}, p.tagline),
-      h("p", { class: "price" }, p.price_label),
+      p.status === "aperto" ? null : h("p", { class: "price" }, p.price_label),
       h("div", { class: "sp-actions" },
         primary,
         h("a", { class: "btn btn-light", href: p.url }, p.view_label),
       ),
       p.site ? h("p", { class: "note" }, h("a", { href: p.site, ...EXT }, p.site_label, extMark(this.data.ui.new_tab))) : null,
-      h("p", { class: "note" }, h("a", { href: p.ask_href }, p.ask_label), " · ", this.data.shop.shipping));
+      p.status === "aperto" ? null : h("p", { class: "note" }, h("a", { href: p.ask_href }, p.ask_label), " · ", this.data.shop.shipping));
     this.card.replaceChildren(card);
     this.announce(`${p.name}. ${p.status_label}. ${p.price_label}`);
     if (focus) card.querySelector("h3").focus({ preventScroll: true });
@@ -225,6 +244,9 @@ export class UI {
     return [
       this.title(a.h),
       ...a.p.map((p, i) => h("p", { class: i === 0 ? "lead" : null }, p)),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, a.open_h),
+        h("ul", { class: "sp-list" }, a.open.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, a.explore_h),
         h("ul", { class: "sp-doors" }, a.explore.map((x) => h("li", {},

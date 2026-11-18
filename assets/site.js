@@ -2,21 +2,37 @@
 (function () {
   "use strict";
 
-  // Tema chiaro o scuro: la scelta resta salvata nel browser. La scena 3D ascolta l'evento "lm-theme".
+  // Tema: scuro, chiaro oppure "dal vivo". La scelta resta salvata nel browser (lm-theme).
+  // "Dal vivo" nelle pagine classiche sceglie chiaro o scuro dall'ora del visitatore (chiaro dalle 7 alle 19),
+  // senza chiedere nulla; nella scena 3D segue il sole e il meteo veri (static/scene/live.js), che ascolta
+  // l'evento "lm-theme". Comandi: pulsanti [data-theme-choice] (scena) e menu [data-theme-select] (intestazione).
+  var themeSync = null;
   (function () {
     var root = document.documentElement;
-    var btns = Array.prototype.slice.call(document.querySelectorAll("[data-theme-toggle]"));
-    function current() { return root.dataset.theme === "light" ? "light" : "dark"; }
-    function paint() { // il pulsante mostra il tema a cui si passa
-      btns.forEach(function (b) { b.textContent = current() === "light" ? b.dataset.labelDark : b.dataset.labelLight; });
+    var choices = Array.prototype.slice.call(document.querySelectorAll("[data-theme-choice]"));
+    var selects = Array.prototype.slice.call(document.querySelectorAll("[data-theme-select]"));
+    function mode() { return root.dataset.themeMode === "live" ? "live" : root.dataset.theme === "light" ? "light" : "dark"; }
+    function byHour() { var h = new Date().getHours(); return h >= 7 && h < 19 ? "light" : "dark"; }
+    function show(theme) { if (theme === "light") root.dataset.theme = "light"; else delete root.dataset.theme; }
+    function paint() {
+      var m = mode();
+      choices.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themeChoice === m)); });
+      selects.forEach(function (s) { s.value = m; });
     }
-    function set(theme) {
-      if (theme === "light") root.dataset.theme = "light"; else delete root.dataset.theme;
-      try { localStorage.setItem("lm-theme", theme); } catch (e) { /* storage bloccato */ }
+    function set(m) {
+      if (m !== "light" && m !== "live") m = "dark";
+      if (m === "live") root.dataset.themeMode = "live"; else delete root.dataset.themeMode;
+      show(m === "live" ? byHour() : m);
+      try { localStorage.setItem("lm-theme", m); } catch (e) { /* storage bloccato */ }
       paint();
-      window.dispatchEvent(new CustomEvent("lm-theme", { detail: theme }));
+      window.dispatchEvent(new CustomEvent("lm-theme", { detail: m }));
     }
-    btns.forEach(function (b) { b.addEventListener("click", function () { set(current() === "light" ? "dark" : "light"); }); });
+    // riscegliere "dal vivo" quando e' gia' attivo vale come nuova scelta: la scena puo' chiedere la posizione
+    choices.forEach(function (b) { b.addEventListener("click", function () { if (b.dataset.themeChoice !== mode() || mode() === "live") set(b.dataset.themeChoice); }); });
+    selects.forEach(function (s) { s.addEventListener("change", function () { set(s.value); }); });
+    // "dal vivo" fuori dalla scena: il tema segue l'ora (nella scena lo decide la scena, con il sole vero)
+    themeSync = function () { if (mode() === "live" && !root.classList.contains("scene-mode")) show(byHour()); };
+    setInterval(themeSync, 60000);
     paint();
   })();
 
@@ -137,6 +153,7 @@
       root.hidden = true;
       setLofiInert(false);
       if (api) api.pause();
+      if (themeSync) themeSync();
       if (!opts.auto) setPref("lofi");
       if (opts.message) showToast(opts.message);
       if (enterBtn && !opts.auto) enterBtn.focus();

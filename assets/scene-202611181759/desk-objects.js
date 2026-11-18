@@ -1,6 +1,7 @@
 // Banco da lavoro e oggetti sopra. Tutta la geometria e' costruita in codice.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { createIchosynth } from "./ichosynth.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
@@ -594,7 +595,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   sections.about = pad.group;
   onProgress(0.3);
 
-  // synth: due sul gradino in legno, due sul banco
+  // strumenti: due sul gradino in legno, uno sul banco
   const riser = box(0.66, 0.07, 0.27, M.wood, 0.008, 3);
   riser.position.set(0.63, DESK.y + 0.035, -0.235);
   shadow(riser);
@@ -603,13 +604,14 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const spots = {
     ichosynth: [0.47, -0.24, 0.05, DESK.y + 0.07],
     "open-orc": [0.81, -0.24, -0.1, DESK.y + 0.07],
-    "ichosynth-mini": [0.37, 0.14, 0.1],
-    stame: [0.68, 0.15, -0.08],
+    stame: [0.53, 0.15, -0.05],
   };
   const synths = [];
   let i = 0;
   for (const p of data.shop.products) {
-    const s = await createSynth(M, p, ledMats);
+    // Ichosynth ha il suo modello (la griglia di LED non e' un frontale con le manopole); gli altri nascono dal frontale SVG
+    const s = p.slug === "ichosynth" ? createIchosynth(M, p) : await createSynth(M, p, ledMats);
+    if (s.update) updaters.push(s.update);
     const [x, z, ry, y] = spots[p.slug] || [0.3 + i * 0.2, 0.0, 0];
     place(s.group, x, z, ry, y ?? DESK.y);
     s.group.userData.slug = p.slug;
@@ -638,7 +640,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   };
   const up = (p, h) => p.clone().add(V(0, h, 0));
   const a1 = jackW("ichosynth", 0), b1 = jackW("open-orc", 0);
-  if (a1 && b1) root.add(patchCable(M, 0xc8261b, [a1, up(a1, 0.035), up(a1.clone().lerp(b1, 0.5), 0.07), up(b1, 0.035), b1]));
+  if (a1 && b1) root.add(patchCable(M, 0xc8261b, [a1, V(a1.x, a1.y + 0.004, a1.z - 0.03), V(a1.x + 0.07, a1.y + 0.03, a1.z - 0.04), up(a1.clone().lerp(b1, 0.6), 0.08), up(b1, 0.035), b1]));
   const a2 = jackW("stame", 0);
   const recIn = recorder.group.localToWorld(V(-0.1125, 0.032, 0.035));
   const recOut = recorder.group.localToWorld(V(-0.15, 0.032, 0.035));

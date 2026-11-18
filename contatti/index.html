@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Contatti — Luigi Massari</title>
-<meta name="description" content="Contatta Luigi Massari per consulenza IT e AI, modellazione, stampa 3D e laser, strumenti musicali elettronici e formazione.">
+<meta name="description" content="Contatta Luigi Massari per consulenza IT e AI, sviluppo software, modellazione e stampa 3D, taglio laser, strumenti elettronici e formazione.">
 <link rel="canonical" href="https://luigimassari.com/contatti/">
 <link rel="alternate" hreflang="it" href="https://luigimassari.com/contatti/">
 <link rel="alternate" hreflang="en" href="https://luigimassari.com/en/contact/">
 <link rel="alternate" hreflang="x-default" href="https://luigimassari.com/contatti/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Contatti — Luigi Massari">
-<meta property="og:description" content="Contatta Luigi Massari per consulenza IT e AI, modellazione, stampa 3D e laser, strumenti musicali elettronici e formazione.">
+<meta property="og:description" content="Contatta Luigi Massari per consulenza IT e AI, sviluppo software, modellazione e stampa 3D, taglio laser, strumenti elettronici e formazione.">
 <meta property="og:url" content="https://luigimassari.com/contatti/">
 <meta property="og:image" content="https://luigimassari.com/assets/og.png">
 <meta property="og:locale" content="it_IT">
@@ -19,8 +19,8 @@
 <meta name="theme-color" content="#07090D">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<script>try{if(localStorage.getItem("lm-theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
-<link rel="stylesheet" href="/assets/site.css?v=202611181701">
+<script>try{var m=localStorage.getItem("lm-theme"),h=new Date().getHours(),d=document.documentElement;if(m==="live")d.dataset.themeMode="live";if(m==="light"||(m==="live"&&h>=7&&h<19))d.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/site.css?v=202611181759">
 
 
 
@@ -33,14 +33,20 @@
     <nav id="nav" class="tuner" aria-label="Sezioni del sito" data-tuner>
       <ul>
         <li><a href="/consulenza/" data-station="dev">Consulenza IT e AI</a></li>
-        <li><a href="/#stampa-3d" data-station="print">Stampa 3D e laser</a></li>
-        <li><a href="/elettrofoni/" data-station="shop">Strumenti</a></li>
+        <li><a href="/#stampa-3d" data-station="print">3D e laser</a></li>
+        <li><a href="/elettrofoni/" data-station="shop">Synth e DIY</a></li>
         <li><a href="/#formazione" data-station="lab">Formazione</a></li>
         <li><a href="/contatti/" data-station="contact" aria-current="page">Contatti</a></li>
       </ul>
       <span class="tuner-needle" aria-hidden="true"></span>
     </nav>
-    <button type="button" class="lang theme-toggle" data-theme-toggle data-label-light="Chiaro" data-label-dark="Scuro" title="Passa dal tema scuro al tema chiaro e viceversa">Chiaro</button>
+    <label class="theme-select"><span class="visually-hidden">Tema</span>
+      <select class="lang" data-theme-select title="Dal vivo: nella versione 3D la luce e il meteo sono quelli veri del posto in cui ti trovi (chiede la posizione); nelle altre pagine il tema segue l&#39;ora">
+        <option value="dark">Scuro</option>
+        <option value="light">Chiaro</option>
+        <option value="live">Dal vivo</option>
+      </select>
+    </label>
     <a class="lang" href="/en/contact/" hreflang="en" lang="en">English</a>
   </div>
 </header>
@@ -50,7 +56,7 @@
   <div class="wrap contact-grid">
     <div>
       <h1 class="display display-md">Contatti</h1>
-      <p class="lede">Risposta entro due giorni lavorativi. Bastano poche righe su cosa ti serve e per quando.</p>
+      <p class="lede">Risposta entro due giorni lavorativi. Bastano poche righe su che cosa serve e per quando.</p>
       <h2 class="h3 contact-direct">Oppure direttamente</h2>
       <p><a class="big-link" href="mailto:info@luigimassari.com">info@luigimassari.com</a></p>
       
@@ -59,7 +65,7 @@
       <div class="field"><label for="f-name">Nome</label><input id="f-name" name="name" autocomplete="name" required></div>
       <div class="field"><label for="f-email">La tua email</label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
       <div class="field"><label for="f-topic">Argomento</label>
-        <select id="f-topic" name="topic"><option selected>Consulenza AI e automazioni</option><option>Consulenza IT e sicurezza</option><option>Web app o gestionale</option><option>Sito web</option><option>Strumenti musicali</option><option>Formazione</option><option>Modellazione, stampa 3D e laser</option><option>Altro</option></select></div>
+        <select id="f-topic" name="topic"><option selected>Consulenza AI e automazioni</option><option>Check-up informatico</option><option>Software su misura</option><option>Progetto fai-da-te</option><option>Strumenti musicali</option><option>Formazione</option><option>Modellazione, stampa 3D e laser</option><option>Altro</option></select></div>
       <div class="field"><label for="f-msg">Messaggio</label><textarea id="f-msg" name="message" rows="6" placeholder="Cosa ti serve, per quando, ed eventuali link utili." required></textarea></div>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary" type="submit">Prepara l&#39;email</button>
@@ -73,7 +79,7 @@
   <div class="wrap footer-inner">
     <div>
       <p class="wordmark wordmark-footer"><span class="led" aria-hidden="true"></span>Luigi Massari</p>
-      <p class="muted">Consulenza IT e AI, stampa 3D e laser, strumenti musicali elettronici e formazione, da Taranto.</p>
+      <p class="muted">Consulenza IT e AI, sviluppo software, modellazione e stampa 3D, taglio laser, strumenti elettronici e formazione. Taranto.</p>
     </div>
     <div class="footer-links">
       <a href="mailto:info@luigimassari.com">info@luigimassari.com</a>
@@ -88,6 +94,6 @@
   </div>
 </footer>
 
-<script src="/assets/site.js?v=202611181701" defer></script>
+<script src="/assets/site.js?v=202611181759" defer></script>
 </body>
 </html>
