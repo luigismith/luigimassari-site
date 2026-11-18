@@ -102,7 +102,7 @@ export function createLamp() {
   g.name = "lamp";
   const metal = new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.35, metalness: 0.85 });
   const base = V(-0.99, DESK.y, -0.3);
-  const barA = V(-0.99, 1.3, -0.3), barB = V(-0.16, 1.3, -0.1);
+  const barA = V(-0.99, 1.56, -0.3), barB = V(-0.16, 1.56, -0.1);
   const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, 0.012, 40), metal);
   foot.position.copy(base).add(V(0, 0.006, 0));
   g.add(foot, rod(base, barA, 0.008, metal), rod(barA, barB, 0.011, metal, 12));
@@ -247,29 +247,38 @@ function createScope(M) {
 function createMonitor(M, data) {
   const g = new THREE.Group();
   g.name = "monitor";
-  const sw = 0.56, sh = 0.35;
+  // pannello trasparente (come un OLED trasparente): attraverso lo schermo si intravede la vetrata
+  const sw = 0.8, sh = 0.5;
   const code = new CodeScreen(1280, 800, data.ui.assistant);
   const head = new THREE.Group();
-  head.position.set(0, 0.25, -0.03);
-  head.rotation.x = -0.06;
-  head.add(box(sw + 0.026, sh + 0.03, 0.032, M.plastic, 0.008, 3));
-  const back = box(sw * 0.7, sh * 0.6, 0.05, M.plastic, 0.02, 3);
-  back.position.set(0, -0.01, -0.035);
-  head.add(back);
-  // schermo opaco (niente riflessi delle luci): solo la sua luce
+  head.position.set(0, 0.075 + sh / 2, -0.03);
+  head.rotation.x = -0.05;
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.35, metalness: 0.85 });
+  const ft = 0.007;
+  for (const [w, h, x, y] of [[sw + ft * 2, ft, 0, sh / 2 + ft / 2], [sw + ft * 2, ft * 2.4, 0, -sh / 2 - ft * 1.2], [ft, sh, -sw / 2 - ft / 2, 0], [ft, sh, sw / 2 + ft / 2, 0]]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), frameMat);
+    bar.position.set(x, y, 0);
+    head.add(bar);
+  }
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, 0.004),
+    new THREE.MeshBasicMaterial({ color: 0x050b12, transparent: true, opacity: 0.34, depthWrite: false })); // velatura senza riflessi
+  glass.renderOrder = 1;
+  head.add(glass);
+  // lo sfondo della texture e' semitrasparente (vedi CodeScreen): testo pieno, fondo che lascia intravedere
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh),
-    new THREE.MeshBasicMaterial({ map: code.texture, color: new THREE.Color(1.5, 1.5, 1.5) }));
-  screen.position.set(0, 0.004, 0.0165);
+    new THREE.MeshBasicMaterial({ map: code.texture, color: new THREE.Color(1.5, 1.5, 1.5), transparent: true, depthWrite: false }));
+  screen.position.set(0, 0, 0.0035);
+  screen.renderOrder = 2;
   head.add(screen);
   const pled = new THREE.Mesh(new THREE.SphereGeometry(0.0025, 10, 8), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xf2a33a, emissiveIntensity: 6 }));
-  pled.position.set(sw / 2 - 0.01, -sh / 2 - 0.008, 0.016);
+  pled.position.set(sw / 2 - 0.012, -sh / 2 - ft * 1.2, 0.0065);
   head.add(pled);
   g.add(head);
-  const neck = box(0.05, 0.2, 0.025, M.graphite, 0.006);
-  neck.position.set(0, 0.11, -0.07);
+  const neck = box(0.07, 0.085, 0.014, frameMat, 0.004);
+  neck.position.set(0, 0.045, -0.04);
   g.add(neck);
-  const foot = box(0.22, 0.012, 0.16, M.graphite, 0.005);
-  foot.position.set(0, 0.006, -0.05);
+  const foot = box(0.3, 0.01, 0.17, frameMat, 0.004);
+  foot.position.set(0, 0.005, -0.03);
   g.add(foot);
   // tastiera
   const kb = new THREE.Group();
@@ -295,7 +304,7 @@ function createMonitor(M, data) {
   glow.position.set(0, 0.22, 0.25);
   g.add(glow);
   shadow(g);
-  screen.castShadow = false;
+  screen.castShadow = false; glass.castShadow = false;
   return { group: g, screen, update: (t, dt) => code.update(dt) };
 }
 
@@ -659,7 +668,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   place(station.group, 0.12, 0.32, 0.15);
   updaters.push(station.update);
   place(createSpool(M).group, 0.22, -0.3, 0.4);
-  place(createMug().group, -0.1, -0.19, 2.4);
+  place(createMug().group, 0.05, -0.2, 2.4);
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;

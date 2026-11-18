@@ -17,7 +17,7 @@ import { SceneAudio } from "./audio.js";
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
   overview: { pos: V(-0.4, 1.52, 1.76), target: V(0.14, 1.03, -0.14), fov: 41 },
-  dev: { pos: V(-0.4, 1.12, 0.78), target: V(-0.45, 0.98, -0.18), fov: 40 },
+  dev: { pos: V(-0.38, 1.2, 1.2), target: V(-0.45, 1.07, -0.2), fov: 40 },
   shop: { pos: V(0.6, 1.28, 0.74), target: V(0.6, 0.84, -0.04), fov: 40 },
   about: { pos: V(0.0, 1.2, 0.5), target: V(0.05, 0.77, 0.06), fov: 40 },
   contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },

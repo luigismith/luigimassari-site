@@ -364,7 +364,8 @@ export class CodeScreen {
   }
   drawChat(g, x, y, w, h) {
     const [qn, an] = this.chatProgress();
-    g.fillStyle = "#0F1A26"; g.fillRect(x, y, w, h);
+    g.clearRect(x, y, w, h); // il codice non deve trapelare sotto il riquadro
+    g.fillStyle = "rgba(15, 26, 38, 0.8)"; g.fillRect(x, y, w, h);
     g.fillStyle = "rgba(157,176,191,.25)"; g.fillRect(x, y, 2, h);
     g.fillStyle = "#FFB44A"; g.beginPath(); g.arc(x + 42, y + 46, 9, 0, Math.PI * 2); g.fill();
     g.fillStyle = "#EEF1EC"; g.font = `700 30px ${FONT}`; g.fillText(this.chat.title, x + 64, y + 56);
@@ -414,14 +415,16 @@ export class CodeScreen {
     const { g } = this;
     const W = LW, H = LH, f = CODE_FILES[this.file];
     g.setTransform(this.k, 0, 0, this.k, 0, 0);
-    g.fillStyle = C_BG; g.fillRect(0, 0, W, H);
+    // fondo semitrasparente: lo schermo e' un pannello traslucido
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "rgba(9, 14, 20, 0.66)"; g.fillRect(0, 0, W, H);
     // barra delle schede
-    g.fillStyle = "#151c24"; g.fillRect(0, 0, W, 56);
+    g.fillStyle = "rgba(21, 28, 36, 0.82)"; g.fillRect(0, 0, W, 56);
     g.font = `500 22px ui-monospace, "Cascadia Mono", Consolas, monospace`;
     let x = 0;
     CODE_FILES.forEach((cf, i) => {
       const w = g.measureText(cf.name).width + 56;
-      if (i === this.file) { g.fillStyle = C_BG; g.fillRect(x, 0, w, 56); g.fillStyle = AMB; g.fillRect(x, 52, w, 4); }
+      if (i === this.file) { g.fillStyle = "rgba(9, 14, 20, 0.9)"; g.fillRect(x, 0, w, 56); g.fillStyle = AMB; g.fillRect(x, 52, w, 4); }
       g.fillStyle = i === this.file ? "#e8eef0" : "#7c8a96";
       g.fillText(cf.name, x + 28, 36);
       x += w;
@@ -445,7 +448,7 @@ export class CodeScreen {
     }
     if (this.chat) this.drawChat(g, 968, 56, W - 968, H - 96);
     // barra di stato
-    g.fillStyle = "#1c2733"; g.fillRect(0, H - 40, W, 40);
+    g.fillStyle = "rgba(28, 39, 51, 0.86)"; g.fillRect(0, H - 40, W, 40);
     g.fillStyle = "#aeb6bb"; g.font = `500 20px ui-monospace, Consolas, monospace`;
     g.fillText(`${f.name}  ·  ${lines.length}:${(lines[lines.length - 1] || "").length + 1}  ·  UTF-8`, 24, H - 13);
     g.fillStyle = RED; g.beginPath(); g.arc(W - 30, H - 20, 7, 0, Math.PI * 2); g.fill();
