@@ -115,7 +115,13 @@ export class UI {
 
   // --- pannello ---
   get panelOpen() { return !this.panel.hidden; }
-  panelWidth() { return this.panel.hidden ? Math.min(440, window.innerWidth * 0.38) : this.panel.getBoundingClientRect().width; }
+  // bordo destro della colonna di testo: a destra di questo resta visibile la scena
+  panelRight() {
+    const r = this.panelBody.getBoundingClientRect();
+    if (r.width) return r.right;
+    const w = window.innerWidth, left = Math.min(130, Math.max(28, w * 0.09));
+    return Math.min(w * 0.6, 760 + left);
+  }
 
   openPanel(view, { focus = true } = {}) {
     clearTimeout(this.closeTimer);
