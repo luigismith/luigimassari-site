@@ -224,7 +224,6 @@ export class UI {
         h("ul", { class: "sp-products" }, this.productButtons.map((b) => h("li", {}, b)))),
       this.card,
       this.galleryBlock("synth", this.data.gallery.hsynth),
-      this.galleryBlock("console", this.data.gallery.hconsole, this.data.gallery.pconsole),
       h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: s.page }, s.page_label)),
     ];
     if (this.selected) queueMicrotask(() => this.showProduct(this.selected, false));
@@ -383,23 +382,28 @@ export class UI {
     ];
   }
 
-  // la console portatile: Ctrl-Alt-Revenge, il videogioco in sviluppo
+  // la console portatile: Videogames, cioe' Ctrl-Alt-Revenge e le console rimesse a nuovo
   gamePanel() {
     const g = this.data.game, ext = (href, text) => h("a", { class: "btn btn-primary", href, ...EXT }, text, extMark(this.data.ui.new_tab));
     return [
-      this.title(g.name),
-      h("p", { class: "status" }, g.status),
-      h("p", { class: "lead" }, g.lead),
-      h("figure", { class: "sp-figure" },
-        h("img", { src: g.image, alt: g.image_alt, loading: "lazy", width: "1000", height: "469" }),
-        h("figcaption", {}, g.image_note)),
-      h("div", { class: "sp-actions" }, ext(g.site, g.site_label)),
+      this.title(g.h),
+      h("p", { class: "lead" }, g.p),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, g.name),
+        h("p", { class: "status" }, g.status),
+        h("p", {}, g.lead),
+        h("figure", { class: "sp-figure" },
+          h("img", { src: g.image, alt: g.image_alt, loading: "lazy", width: "1000", height: "469" }),
+          h("figcaption", {}, g.image_note)),
+        h("div", { class: "sp-actions" }, ext(g.site, g.site_label))),
       h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.world_h), ...g.world.map((p) => h("p", {}, p))),
       h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.hero_h), h("p", {}, g.hero)),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, g.play_h),
         h("ul", { class: "sp-list" }, g.play.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
       h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.made_h), h("p", {}, g.made), h("p", { class: "note" }, g.note)),
+      this.galleryBlock("console", this.data.gallery.hconsole, this.data.gallery.pconsole),
     ];
   }
+
 }

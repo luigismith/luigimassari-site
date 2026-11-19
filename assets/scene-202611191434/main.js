@@ -217,9 +217,17 @@ export async function start({ data, root, force, toLofi }) {
   // --- oggetti cliccabili: scatole invisibili attorno a ogni sezione ---
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
   const hits = [];
-  function addHit(obj, view, slug = null) {
+  // skip: nomi dei pezzi da non contare nel riquadro (la tastiera davanti al monitor coprirebbe il tablet del profilo)
+  function addHit(obj, view, slug = null, skip = []) {
     obj.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(obj).expandByScalar(0.01);
+    const b = new THREE.Box3();
+    if (!skip.length) b.setFromObject(obj);
+    else obj.traverse((o) => {
+      if (!o.isMesh) return;
+      for (let p = o; p && p !== obj; p = p.parent) if (skip.includes(p.name)) return;
+      b.expandByObject(o);
+    });
+    b.expandByScalar(0.01);
     const s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const m = new THREE.Mesh(new THREE.BoxGeometry(s.x, s.y, s.z), hitMat);
     m.position.copy(c);
@@ -227,14 +235,14 @@ export async function start({ data, root, force, toLofi }) {
     scene.add(m);
     hits.push(m);
   }
-  addHit(objects.sections.dev, "dev");
+  addHit(objects.sections.dev, "dev", null, ["keyboard"]);
   addHit(extras.printer, "print");
   addHit(objects.sections.about, "about");
   addHit(objects.sections.contact, "contact");
   addHit(extras.board, "lab");
   addHit(extras.headphones, "sound"); // non e' una sezione: la cuffia accende e spegne il suono
   addHit(extras.laser, "laser");      // i pezzi tagliati al laser: la scheda del taglio laser
-  addHit(extras.handheld, "game");    // la console portatile: la scheda di Ctrl-Alt-Revenge
+  addHit(extras.handheld, "game");    // la console portatile: la scheda Videogames
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---

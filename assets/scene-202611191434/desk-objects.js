@@ -243,6 +243,7 @@ function createMonitor(M, data) {
   // tastiera
   const kb = new THREE.Group();
   kb.name = "keyboard";
+  kb.userData.dynamic = true;   // resta un gruppo a se': il riquadro cliccabile del monitor la esclude
   const kbBase = box(0.4, 0.016, 0.135, M.plastic, 0.005, 2);
   kbBase.position.y = 0.008;
   kb.add(kbBase);
@@ -258,7 +259,7 @@ function createMonitor(M, data) {
   keys.setMatrixAt(n++, new THREE.Matrix4().compose(V(0, 0.019, 0.055), new THREE.Quaternion(), V(5.5, 1, 1)));
   kb.add(keys);
   kb.position.set(-0.06, 0, 0.29);
-  kb.rotation.y = -0.07;
+  kb.rotation.y = 0;            // dritta, parallela al bordo del banco come il monitor
   g.add(kb);
   const glow = new THREE.PointLight(0x8fb2e8, 0.5, 1.4, 2);
   glow.position.set(0, 0.22, 0.25);
