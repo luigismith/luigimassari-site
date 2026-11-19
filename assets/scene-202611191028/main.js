@@ -22,9 +22,11 @@ export const VIEWS = {
   overview: { pos: V(-0.64, 1.6, 2.02), target: V(-0.02, 1.02, -0.14), fov: 41 },
   dev: { pos: V(-0.06, 1.24, 1.5), target: V(-0.15, 1.07, -0.2), fov: 40 },
   print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
-  shop: { pos: V(0.64, 1.5, 1.12), target: V(0.64, 0.8, 0.0), fov: 40 },      // anche Stame, che sta davanti al gradino
+  shop: { pos: V(0.64, 1.42, 1.0), target: V(0.64, 0.8, -0.08), fov: 40 },     // anche Stame, appoggiato al gradino
   about: { pos: V(0.06, 1.2, 0.5), target: V(0.11, 0.77, 0.06), fov: 40 },
-  contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },
+  contact: { pos: V(0.84, 1.1, 0.86), target: V(0.95, 0.79, 0.27), fov: 38 },
+  laser: { pos: V(-0.38, 1.16, 0.6), target: V(-0.5, 0.77, -0.01), fov: 36 },
+  game: { pos: V(-0.05, 1.08, 0.78), target: V(-0.125, 0.77, 0.335), fov: 34 },
   lab: { pos: V(0.02, 1.36, 0.1), target: V(1.3, 1.33, -0.2), fov: 42 },
 };
 
@@ -231,6 +233,8 @@ export async function start({ data, root, force, toLofi }) {
   addHit(objects.sections.contact, "contact");
   addHit(extras.board, "lab");
   addHit(extras.headphones, "sound"); // non e' una sezione: la cuffia accende e spegne il suono
+  addHit(extras.laser, "laser");      // i pezzi tagliati al laser: la scheda del taglio laser
+  addHit(extras.handheld, "game");    // la console portatile: la scheda di Ctrl-Alt-Revenge
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
@@ -256,6 +260,8 @@ export async function start({ data, root, force, toLofi }) {
     addTag("lab", V(h.position.x, h.position.y - h.geometry.parameters.height / 2 - 0.1, h.position.z), 0);
   }
   addTag("contact", hitOf("contact")[0].userData.top, 22);
+  addTag("laser", hitOf("laser")[0].userData.top, 18);
+  addTag("game", hitOf("game")[0].userData.top, 16);
   const tagPos = new THREE.Vector3();
   const TAG_MIN_Y = 132; // px dal bordo alto: barra (circa 80) + altezza dell'etichetta
   function updateTags() {

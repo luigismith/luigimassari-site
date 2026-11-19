@@ -166,7 +166,7 @@ export class UI {
 
   openPanel(view, { focus = true } = {}) {
     clearTimeout(this.closeTimer);
-    const build = { dev: () => this.devPanel(), shop: () => this.shopPanel(), about: () => this.aboutPanel(), contact: () => this.contactPanel(), lab: () => this.labPanel(), print: () => this.printPanel() }[view];
+    const build = { dev: () => this.devPanel(), shop: () => this.shopPanel(), about: () => this.aboutPanel(), contact: () => this.contactPanel(), lab: () => this.labPanel(), print: () => this.printPanel(), laser: () => this.laserPanel(), game: () => this.gamePanel() }[view];
     if (!build) return;
     this.view = view;
     this.panelBody.replaceChildren(...build().filter(Boolean));
@@ -243,6 +243,7 @@ export class UI {
       h("p", { class: "status status-" + p.status }, p.status_label),
       h("h3", { id: "sp-card-h", tabindex: "-1" }, p.name),
       h("p", {}, p.tagline),
+      p.highlights && p.highlights.length ? h("ul", { class: "sp-highlights" }, p.highlights.map((x) => h("li", {}, x))) : null,
       p.status === "aperto" ? null : h("p", { class: "price" }, p.price_label),
       h("div", { class: "sp-actions" },
         primary,
@@ -335,4 +336,36 @@ export class UI {
   }
   labPanel() { const l = this.data.lab; return this.itemsPanel(l, { href: l.more_href, label: l.more }); }
   printPanel() { return this.itemsPanel(this.data.print); }
+
+  // il taglio laser: i pezzi sul banco (pannello e scatola a incastri), con un esempio vero
+  laserPanel() {
+    const l = this.data.laser;
+    return [
+      ...this.itemsPanel(l),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, l.example_h),
+        h("p", {}, l.example),
+        h("p", {}, h("a", { class: "sp-link", href: l.example_href }, l.example_link))),
+    ];
+  }
+
+  // la console portatile: Ctrl-Alt-Revenge, il videogioco in sviluppo
+  gamePanel() {
+    const g = this.data.game, ext = (href, text) => h("a", { class: "btn btn-primary", href, ...EXT }, text, extMark(this.data.ui.new_tab));
+    return [
+      this.title(g.name),
+      h("p", { class: "status" }, g.status),
+      h("p", { class: "lead" }, g.lead),
+      h("figure", { class: "sp-figure" },
+        h("img", { src: g.image, alt: g.image_alt, loading: "lazy", width: "1000", height: "469" }),
+        h("figcaption", {}, g.image_note)),
+      h("div", { class: "sp-actions" }, ext(g.site, g.site_label)),
+      h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.world_h), ...g.world.map((p) => h("p", {}, p))),
+      h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.hero_h), h("p", {}, g.hero)),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, g.play_h),
+        h("ul", { class: "sp-list" }, g.play.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
+      h("div", { class: "sp-section" }, h("h3", { class: "sp-h" }, g.made_h), h("p", {}, g.made), h("p", { class: "note" }, g.note)),
+    ];
+  }
 }

@@ -119,11 +119,18 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 .sp-card { margin-top: 18px; padding: 18px; border-radius: 10px; background: var(--inchiostro); color: var(--serigrafia); }
 .sp-card h3 { font-size: 24px; font-weight: 800; font-stretch: 118%; margin: 4px 0 6px; }
 .sp-card p { color: var(--serigrafia-2); }
+.sp-highlights { list-style: none; padding: 0; margin: 10px 0 14px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; }
+.sp-highlights li { position: relative; padding-left: 1.3em; }
+.sp-highlights li::before { content: ""; position: absolute; left: 0; top: .66em; width: .55em; height: 2px; background: var(--ambra); }
 .sp-card .price { color: var(--serigrafia); font-size: 19px; font-weight: 700; font-stretch: 110%; margin: 10px 0 0; }
 .sp-card .btn-light { border-color: var(--serigrafia); color: var(--serigrafia); }
 .sp-card :focus-visible { outline-color: var(--ambra); }
 .sp-card .status { color: var(--serigrafia); }
 .sp-card .note { font-size: 13px; margin: 12px 0 0; }
+.sp-figure { margin: 18px 0 6px; max-width: 580px; }
+.sp-figure img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.sp-figure figcaption { font-size: 13px; line-height: 1.45; margin-top: 8px; opacity: .8; }
+.sp-section > p + p { margin-top: 10px; }
 
 .sp-timeline { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--linea); }
 .sp-timeline li { padding: 0 0 10px; font-size: 14.5px; }

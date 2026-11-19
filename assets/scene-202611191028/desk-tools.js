@@ -367,7 +367,7 @@ function notebook(M) {
 }
 
 // place(oggetto, x, z, rotazione) lo posa sul banco; chi sta sul tappetino va alzato del suo spessore
-export function addTools(place, M) {
+export function addTools(place, M, laser) {
   const ply = plywood();
   const onMat = (o) => { o.position.y += MAT_TOP; return o; };
   place(cuttingMat(), -0.345, 0.29, 0.04);
@@ -377,8 +377,8 @@ export function addTools(place, M) {
   onMat(place(looseBoard(), -0.262, 0.335, -0.18));
   onMat(place(solderReel(M), -0.238, 0.238, 0.6));
   place(caliper(M), -1.0, 0.338, 0.03); // display leggibile da chi guarda, becchi grandi verso il bordo del banco
-  place(laserPanel(ply), -0.5, 0.062, 0.06);
-  place(fingerBox(ply), -0.49, -0.078, 0.34);
+  place(laserPanel(ply), -0.5, 0.062, 0.06, laser);     // i pezzi tagliati al laser: si cliccano (scheda del taglio laser)
+  place(fingerBox(ply), -0.49, -0.078, 0.34, laser);
   place(microphone(M), 1.0, -0.075, -0.5);
-  place(notebook(M), 0.845, 0.3, -0.12);
+  place(notebook(M), 0.44, 0.32, -0.1);
 }

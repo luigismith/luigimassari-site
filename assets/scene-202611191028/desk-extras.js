@@ -629,7 +629,7 @@ export function createExtras(data) {
   place(printerObj.group, -0.9, 0.08, 0.28, root);
   place(prints(), -0.63, 0.1, 0.4);
   const hp = place(headphones(M), -0.6, 0.33, 0.5, root);
-  place(handheld(M, data.about.projects[0][0]), -0.125, 0.335, -0.2);
+  const hh = place(handheld(M, data.game.name), -0.125, 0.335, -0.2, root);   // si clicca: la scheda di Ctrl-Alt-Revenge
   place(cabinet(M), 1.035, -0.27, -0.1);
   const bb = place(breadboard(M), 0.19, 0.315, 0.12);
   { // cavo USB della scheda: dalla breadboard gira dietro e sparisce sotto il rialzo degli strumenti
@@ -641,7 +641,7 @@ export function createExtras(data) {
     shadow(usb);
     props.add(usb);
   }
-  place(multimeter(M), 0.97, 0.325, 0.35);
+  place(multimeter(M), 0.66, 0.335, 0.25);
   place(toolCup(M), 0.255, -0.14);
   const notes = new THREE.Group();
   notes.name = "notes";
@@ -654,8 +654,11 @@ export function createExtras(data) {
   board.position.set(1.3 - 0.043, 1.33, -0.02);   // parete destra, rivolta verso la stanza
   board.rotation.y = -Math.PI / 2;
   root.add(board);
-  addTools(place, M);
+  const laser = new THREE.Group();
+  laser.name = "laser";
+  root.add(laser);
+  addTools(place, M, laser);
   props.updateMatrixWorld(true);
   for (const child of root.children) mergeStatic(child);
-  return { group: root, printer: printerObj.group, board, headphones: hp, update: printerObj.update };
+  return { group: root, printer: printerObj.group, board, headphones: hp, handheld: hh, laser, update: printerObj.update };
 }

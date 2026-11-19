@@ -6,7 +6,7 @@ import { createStame } from "./stame.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
-  recorderTopTexture, grilleTexture,
+  canvas, tex, FONT,
 } from "./textures.js";
 
 export const DESK = { y: 0.75, w: 2.2, d: 0.8, x0: -1.1, x1: 1.1, z0: -0.4, z1: 0.4 };
@@ -361,57 +361,125 @@ async function createSynth(M, product, ledMats) {
 // ---------------------------------------------------------------------------
 // Registratore a cassette portatile (da reportage, senza marchi)
 // ---------------------------------------------------------------------------
+// Contatti: una segreteria telefonica anni '90. A sinistra la cornetta sulla sua base, con il filo a spirale;
+// a destra la microcassetta dei messaggi (i rocchetti girano), il display rosso con il numero dei messaggi, la spia
+// che lampeggia, il tasto PLAY, la tastiera numerica e l'altoparlante. Nella vista Contatti registra: i rocchetti
+// corrono e la spia resta accesa.
+function answerTopTexture(label) {
+  const c = canvas(920, 680), x = c.getContext("2d");
+  x.fillStyle = "#2b2e33"; x.fillRect(0, 0, 920, 680);
+  // incavo della cornetta
+  x.fillStyle = "#1d1f23"; x.beginPath(); x.roundRect(28, 30, 330, 620, 60); x.fill();
+  // altoparlante: una griglia di fori
+  x.fillStyle = "#15171a";
+  for (let r = 0; r < 7; r++) for (let k = 0; k < 7; k++) { x.beginPath(); x.arc(440 + k * 22, 470 + r * 22, 6, 0, Math.PI * 2); x.fill(); }
+  // cornice della cassetta e del display
+  x.fillStyle = "#111316"; x.beginPath(); x.roundRect(560, 60, 320, 190, 14); x.fill();
+  x.beginPath(); x.roundRect(410, 300, 170, 100, 10); x.fill();
+  x.fillStyle = "#e9ece6"; x.font = `700 26px ${FONT}`; x.textAlign = "center";
+  x.fillText("MESSAGGI", 495, 430);
+  for (const [t, px, py] of [["PLAY", 700, 418], ["REC", 640, 258], ["ERASE", 760, 258]]) {
+    x.font = `600 22px ${FONT}`; x.fillText(t, px, py);
+  }
+  x.font = `800 24px ${FONT}`; x.textAlign = "left"; x.fillStyle = "#c9ccc6";
+  x.fillText(label.toUpperCase(), 400, 110);
+  x.font = `500 15px ${FONT}`; x.fillStyle = "#8e949a";
+  x.fillText("SEGRETERIA", 400, 136);
+  return tex(c);
+}
+function digitsTexture(text) {
+  const c = canvas(160, 90), x = c.getContext("2d");
+  x.fillStyle = "#1a0503"; x.fillRect(0, 0, 160, 90);
+  x.fillStyle = "#ff3b24"; x.font = `700 70px ui-monospace, Consolas, monospace`; x.textAlign = "center";
+  x.fillText(text, 80, 72);
+  return tex(c, { mips: false });
+}
+
 function createRecorder(M, label) {
   const g = new THREE.Group();
   g.name = "recorder";
-  const W = 0.225, H = 0.058, D = 0.158;
-  const body = box(W, H, D, new THREE.MeshStandardMaterial({ color: 0x2a2d32, roughness: 0.5, metalness: 0.3 }), 0.007, 3);
-  body.position.y = H / 2 + 0.004;
+  const W = 0.23, D = 0.17, H = 0.04;
+  const shell = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.55, metalness: 0.15 });
+  const body = box(W, H, D, shell, 0.008, 3);
+  body.position.y = H / 2 + 0.003;
   g.add(body);
-  const topY = H + 0.004 + 0.0006;
-  const pw = W - 0.01, pd = D - 0.01;
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), new THREE.MeshStandardMaterial({ map: recorderTopTexture(label), roughness: 0.38, metalness: 0.75 }));
+  const topY = H + 0.003 + 0.0006;
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.008, D - 0.008), new THREE.MeshStandardMaterial({ map: answerTopTexture(label), roughness: 0.5, metalness: 0.2 }));
   plate.rotation.x = -Math.PI / 2;
   plate.position.y = topY;
   g.add(plate);
-  const at = (px, py, y = topY) => V((px / 1024 - 0.5) * pw, y, (py / 720 - 0.5) * pd);
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry((620 / 1024) * pw, (420 / 720) * pd), M.glass);
+  const pw = W - 0.008, pd = D - 0.008;
+  const at = (px, py, y = topY) => V((px / 920 - 0.5) * pw, y, (py / 680 - 0.5) * pd);
+  // la cornetta: impugnatura e le due capsule, posata nell'incavo
+  const handsetMat = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.42, metalness: 0.1 });
+  const handset = new THREE.Group();
+  const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0115, 0.1, 6, 16), handsetMat);
+  grip.rotation.x = Math.PI / 2;
+  grip.position.y = 0.019;
+  handset.add(grip);
+  for (const sz of [-1, 1]) {
+    const cup = box(0.042, 0.022, 0.05, handsetMat, 0.009, 3);
+    cup.position.set(0, 0.012, sz * 0.058);
+    handset.add(cup);
+    const holes = new THREE.Mesh(new THREE.CircleGeometry(0.012, 20), new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.8 }));
+    holes.rotation.x = -Math.PI / 2;
+    holes.position.set(0, 0.0232, sz * 0.058);
+    handset.add(holes);
+  }
+  handset.position.copy(at(193, 340, topY - 0.001));
+  g.add(handset);
+  // il filo a spirale: dalla capsula davanti scende lungo il fianco ed entra nella base
+  const start = handset.position.clone().add(V(-0.012, 0.006, 0.082)), coils = [];
+  const path = new THREE.CatmullRomCurve3([start, V(-W / 2 - 0.012, topY - 0.01, D / 2 - 0.005), V(-W / 2 - 0.03, 0.006, D * 0.15), V(-W / 2 - 0.006, 0.012, -D * 0.25)]);
+  const N = 420, turns = 46;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, p0 = path.getPointAt(t), tan = path.getTangentAt(t);
+    const n1 = new THREE.Vector3().crossVectors(tan, V(0, 1, 0)); if (n1.lengthSq() < 1e-6) n1.set(1, 0, 0); n1.normalize();
+    const n2 = new THREE.Vector3().crossVectors(tan, n1).normalize(), a = t * turns * Math.PI * 2;
+    coils.push(p0.addScaledVector(n1, Math.cos(a) * 0.0045).addScaledVector(n2, Math.sin(a) * 0.0045));
+  }
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coils), 900, 0.0011, 5), handsetMat));
+  // la microcassetta dei messaggi, dietro un vetro
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry((300 / 920) * pw, (170 / 680) * pd), M.glass);
   glass.rotation.x = -Math.PI / 2;
-  glass.position.copy(at(370, 270, topY + 0.002));
+  glass.position.copy(at(720, 155, topY + 0.0016));
   g.add(glass);
+  const cassette = new THREE.Mesh(new THREE.PlaneGeometry((260 / 920) * pw, (140 / 680) * pd), new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.6 }));
+  cassette.rotation.x = -Math.PI / 2;
+  cassette.position.copy(at(720, 155, topY + 0.0004));
+  g.add(cassette);
   const hubs = [];
-  for (const px of [290, 450]) {
+  for (const px of [660, 780]) {
     const hub = new THREE.Group();
-    hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0085, 0.002, 6), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.5 })));
-    hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.0025, 12), M.black));
-    hub.position.copy(at(px, 277, topY + 0.001));
+    hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0062, 0.0062, 0.0012, 6), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.5 })));
+    hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0026, 0.0026, 0.0016, 12), M.black));
+    hub.position.copy(at(px, 155, topY + 0.0009));
     hub.userData.dynamic = true; // gira: non si unisce al resto
     g.add(hub);
     hubs.push(hub);
   }
-  const recMat = new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.45 });
-  ["rec", "play", "rew", "ff", "stop", "pause"].forEach((key, i) => {
-    const kk = box(0.026, 0.008, 0.02, key === "rec" ? recMat : M.alu, 0.002);
-    kk.position.copy(at(128 + i * 150, 585, topY + (key === "play" ? 0.001 : 0.003)));
-    g.add(kk);
-  });
-  const grilleMap = grilleTexture();
-  const grille = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.62, H * 0.6), new THREE.MeshStandardMaterial({ map: grilleMap, roughness: 0.6, metalness: 0.4 }));
-  grille.position.set(-W * 0.12, H / 2 + 0.004, D / 2 + 0.0008);
-  g.add(grille);
-  const recLed = new THREE.Mesh(new THREE.SphereGeometry(0.0025, 10, 8), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff3322, emissiveIntensity: 0 }));
-  recLed.position.set(W * 0.32, H * 0.65, D / 2 + 0.001);
-  g.add(recLed);
-  const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.003, 20), new THREE.MeshStandardMaterial({ map: grilleMap, roughness: 0.6 }));
-  mic.rotation.x = Math.PI / 2;
-  mic.position.set(W * 0.32, H * 0.38, D / 2 + 0.0015);
-  g.add(mic);
-  // tracolla in cuoio
-  const pts = [
-    V(-W / 2 - 0.004, H * 0.7, -D * 0.2), V(-W / 2 - 0.03, H * 0.4, -D * 0.1), V(-W / 2 - 0.06, 0.004, D * 0.3),
-    V(-W / 2 + 0.02, 0.004, D * 0.8), V(W / 2 + 0.02, 0.004, D * 0.75), V(W / 2 + 0.03, H * 0.35, D * 0.1), V(W / 2 + 0.004, H * 0.7, -D * 0.2),
-  ];
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 80, 0.0035, 6, false), new THREE.MeshStandardMaterial({ color: 0x4a2c1a, roughness: 0.7 })));
+  // display dei messaggi e spia
+  const disp = new THREE.Mesh(new THREE.PlaneGeometry((150 / 920) * pw, (80 / 680) * pd), new THREE.MeshBasicMaterial({ map: digitsTexture("02"), color: new THREE.Color(1.6, 1.6, 1.6) }));
+  disp.rotation.x = -Math.PI / 2;
+  disp.position.copy(at(495, 350, topY + 0.0006));
+  g.add(disp);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.0034, 12, 8), new THREE.MeshStandardMaterial({ color: 0x200404, emissive: 0xff2a14, emissiveIntensity: 2 }));
+  led.position.copy(at(600, 350, topY + 0.001));
+  led.userData.dynamic = true;
+  g.add(led);
+  // tasti: PLAY grande, REC ed ERASE, la tastiera numerica 3 x 4
+  const keyMat = new THREE.MeshStandardMaterial({ color: 0xd9dcd8, roughness: 0.45 });
+  const play = new THREE.Mesh(new THREE.CylinderGeometry(0.0095, 0.0095, 0.004, 24), new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.4, emissive: 0x8a2a00, emissiveIntensity: 0.4 }));
+  play.position.copy(at(700, 350, topY + 0.002));
+  g.add(play);
+  for (const [px, color] of [[640, 0xc8261b], [760, 0x8e949a]]) {
+    const k = box(0.016, 0.004, 0.009, new THREE.MeshStandardMaterial({ color, roughness: 0.45 }), 0.0015, 1);
+    k.position.copy(at(px, 285, topY + 0.002));
+    g.add(k);
+  }
+  const keys = new THREE.InstancedMesh(box(0.012, 0.004, 0.009, keyMat, 0.0015, 1).geometry, keyMat, 12), m4 = new THREE.Matrix4();
+  for (let i = 0; i < 12; i++) keys.setMatrixAt(i, m4.makeTranslation(at(640 + (i % 3) * 70, 480 + Math.floor(i / 3) * 50, topY + 0.002)));
+  g.add(keys);
   shadow(g);
   glass.castShadow = false;
   let spin = 0, rec = 0;
@@ -419,9 +487,10 @@ function createRecorder(M, label) {
     group: g,
     setRecording(on) { rec = on ? 1 : 0; },
     update(t, dt) {
-      spin += dt * (0.3 + rec * 5);
+      spin += dt * (0.25 + rec * 5);
       hubs[0].rotation.y = spin; hubs[1].rotation.y = spin * 0.9;
-      recLed.material.emissiveIntensity = rec * (3 + Math.sin(t * 6) * 1.5);
+      // nuovi messaggi: la spia lampeggia piano; registrando resta accesa
+      led.material.emissiveIntensity = rec ? 3.2 : (Math.sin(t * 3.2) > 0 ? 2.6 : 0.15);
     },
   };
 }
@@ -534,6 +603,30 @@ function createSolderingStation(M) {
   return { group: g, update: (t, dt, c) => { smokeMat.uniforms.uTime.value = t; smokeMat.uniforms.uScale.value = c.heightPx; } };
 }
 
+// vapore del caffe': poche particelle chiare che salgono piano dalla superficie e si allargano
+const STEAM_VERT = /* glsl */ `
+attribute float aSeed;
+uniform float uTime; uniform float uScale;
+varying float vA;
+void main() {
+  float life = fract(uTime * 0.085 + aSeed);
+  vec3 p = position;
+  float h = life * 0.15;
+  p.y += h;
+  p.x += sin(life * 4.0 + aSeed * 31.0 + uTime * 0.5) * 0.012 * life;
+  p.z += cos(life * 3.5 + aSeed * 17.0 + uTime * 0.4) * 0.01 * life;
+  vA = smoothstep(0.0, 0.2, life) * (1.0 - life) * 0.13;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = (0.012 + life * 0.045) * uScale / -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+const STEAM_FRAG = /* glsl */ `
+varying float vA;
+void main() {
+  float d = length(gl_PointCoord - 0.5);
+  gl_FragColor = vec4(vec3(0.93, 0.92, 0.9), smoothstep(0.5, 0.0, d) * vA);
+}`;
+
 function createMug() {
   const g = new THREE.Group();
   g.name = "mug";
@@ -550,7 +643,21 @@ function createMug() {
   dot.position.set(0, 0.055, 0.0412);
   g.add(dot);
   shadow(g);
-  return { group: g };
+  const N = 36, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = i * 2.39996, r = 0.026 * Math.sqrt((i + 0.5) / N);
+    pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = 0.072; pos[i * 3 + 2] = Math.sin(a) * r;
+    seed[i] = (i * 0.618) % 1;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
+  const steamMat = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uScale: { value: 800 } }, vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG, transparent: true, depthWrite: false });
+  const steam = new THREE.Points(geo, steamMat);
+  steam.frustumCulled = false;
+  steam.castShadow = steam.receiveShadow = false;
+  g.add(steam);
+  return { group: g, update: (t, dt, c) => { steamMat.uniforms.uTime.value = t; steamMat.uniforms.uScale.value = c.heightPx; } };
 }
 
 function patchCable(M, color, pts) {
@@ -587,7 +694,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const place = (o, x, z, ry = 0, y = DESK.y) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
 
   const monitor = createMonitor(M, data);
-  place(monitor.group, -0.15, -0.2, 0.12); // a destra della stampante 3D, che altrimenti lo copre
+  place(monitor.group, -0.15, -0.2, 0);    // parallelo al bordo del banco, a destra della stampante 3D
   updaters.push(monitor.update);
   sections.dev = monitor.group;
 
@@ -605,7 +712,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const spots = {
     ichosynth: [0.47, -0.24, 0.05, DESK.y + 0.07],
     "open-orc": [0.81, -0.24, -0.1, DESK.y + 0.07],
-    stame: [0.585, 0.262, -0.04],          // sul banco davanti al gradino, dove prima c'era una tastiera MIDI: Stame la contiene
+    stame: [0.62, 0.035, 0],               // sul banco, appoggiato al gradino degli altri due strumenti
   };
   const synths = [];
   let i = 0;
@@ -622,14 +729,16 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   sections.shop = synths.map((s) => s.group);
 
   const recorder = createRecorder(M, data.ui.cassette);
-  place(recorder.group, 0.98, 0.13, -0.32);
+  place(recorder.group, 0.95, 0.27, -0.38);   // la segreteria dei contatti, in disparte nell'angolo davanti
   updaters.push(recorder.update);
   sections.contact = recorder.group;
 
   const station = createSolderingStation(M);
   place(station.group, -0.37, 0.305, 0.35); // sul tappetino da taglio, dove non copre il tablet
   updaters.push(station.update);
-  place(createMug().group, 0.14, -0.08, 2.4);
+  const mug = createMug();
+  place(mug.group, 0.14, -0.08, 2.4);
+  updaters.push(mug.update);
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;
@@ -642,11 +751,6 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const up = (p, h) => p.clone().add(V(0, h, 0));
   const a1 = jackW("ichosynth", 0), b1 = jackW("open-orc", 0);
   if (a1 && b1) root.add(patchCable(M, 0xc8261b, [a1, V(a1.x, a1.y + 0.004, a1.z - 0.03), V(a1.x + 0.07, a1.y + 0.03, a1.z - 0.04), up(a1.clone().lerp(b1, 0.6), 0.08), up(b1, 0.035), b1]));
-  const a2 = jackW("stame", 0);
-  const recIn = recorder.group.localToWorld(V(-0.1125, 0.032, 0.035));
-  const recOut = recorder.group.localToWorld(V(-0.15, 0.032, 0.035));
-  // dall'uscita sul retro di Stame al registratore, che gli sta accanto: un arco corto dietro la console
-  if (a2) root.add(patchCable(M, 0xf2a33a, [a2, V(a2.x, a2.y + 0.004, a2.z - 0.025), up(a2.clone().lerp(recOut, 0.5).add(V(0, 0, -0.03)), 0.05), up(recOut, 0.03), recOut, recIn]));
   const a3 = jackW("open-orc", 1);
   if (a3) root.add(patchCable(M, 0xe9ece6, [a3, up(a3, 0.03), V(a3.x + 0.05, Y + 0.09, -0.36), V(a3.x + 0.12, Y + 0.004, -0.3), V(a3.x + 0.16, Y + 0.004, -0.2), V(a3.x + 0.12, Y + 0.004, -0.15)]));
   onProgress(1);
