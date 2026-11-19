@@ -201,26 +201,59 @@
     });
   })();
 
-  // Gallerie dei lavori: la miniatura apre la foto grande in un dialogo (Esc o il pulsante lo chiudono)
+  // Gallerie dei lavori: la miniatura apre una galleria in sovraimpressione, con la didascalia, le frecce per
+  // scorrere (anche con i tasti freccia) ed Esc per chiudere. window.lmLightbox(foto, indice, testi) la apre anche
+  // dalla scena 3D (static/scene/ui.js): foto = [{src, alt}], testi = {close, prev, next}.
   (function () {
-    var links = Array.prototype.slice.call(document.querySelectorAll("a[data-lightbox]"));
-    if (!links.length || typeof HTMLDialogElement === "undefined") return;
-    var lang = document.documentElement.lang === "en" ? "en" : "it";
-    var d = document.createElement("dialog");
-    d.className = "lightbox";
-    d.innerHTML = '<button type="button">' + (lang === "en" ? "Close" : "Chiudi") + '</button><img alt=""><p></p>';
-    document.body.appendChild(d);
-    var img = d.querySelector("img"), cap = d.querySelector("p");
-    d.querySelector("button").addEventListener("click", function () { d.close(); });
-    d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
-    links.forEach(function (a) {
-      a.addEventListener("click", function (e) {
-        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
-        e.preventDefault();
-        img.src = a.getAttribute("href");
-        img.alt = a.dataset.caption || "";
-        cap.textContent = a.dataset.caption || "";
-        d.showModal();
+    if (typeof HTMLDialogElement === "undefined") return;
+    var d = null, items = [], at = 0, img, cap, count, opener = null;
+    function build(t) {
+      d = document.createElement("dialog");
+      d.className = "lightbox";
+      d.innerHTML = '<figure><img alt=""><figcaption><span class="lb-cap"></span><span class="lb-n"></span></figcaption></figure>' +
+        '<button type="button" class="lb-close"></button><button type="button" class="lb-prev"><span aria-hidden="true">‹</span></button>' +
+        '<button type="button" class="lb-next"><span aria-hidden="true">›</span></button>';
+      document.body.appendChild(d);
+      img = d.querySelector("img"); cap = d.querySelector(".lb-cap"); count = d.querySelector(".lb-n");
+      d.querySelector(".lb-close").addEventListener("click", function () { d.close(); });
+      d.querySelector(".lb-prev").addEventListener("click", function () { show(at - 1); });
+      d.querySelector(".lb-next").addEventListener("click", function () { show(at + 1); });
+      d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+      d.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft") { e.preventDefault(); show(at - 1); }
+        else if (e.key === "ArrowRight") { e.preventDefault(); show(at + 1); }
+      });
+      d.addEventListener("close", function () { if (opener && opener.focus) opener.focus(); });
+    }
+    function labels(t) {
+      d.querySelector(".lb-close").textContent = t.close || "×";
+      d.querySelector(".lb-prev").setAttribute("aria-label", t.prev || "");
+      d.querySelector(".lb-next").setAttribute("aria-label", t.next || "");
+    }
+    function show(i) {
+      at = (i + items.length) % items.length;
+      img.src = items[at].src; img.alt = items[at].alt || "";
+      cap.textContent = items[at].alt || "";
+      count.textContent = items.length > 1 ? (at + 1) + " / " + items.length : "";
+      d.classList.toggle("lb-single", items.length < 2);
+    }
+    window.lmLightbox = function (list, i, t) {
+      if (!d) build();
+      labels(t || {});
+      items = list; opener = document.activeElement;
+      show(i || 0);
+      if (!d.open) d.showModal();
+    };
+    Array.prototype.slice.call(document.querySelectorAll("[data-gallery-set]")).forEach(function (set) {
+      var links = Array.prototype.slice.call(set.querySelectorAll("a[data-lightbox]"));
+      var list = links.map(function (a) { return { src: a.getAttribute("href"), alt: a.dataset.caption || "" }; });
+      var t = { close: set.dataset.close, prev: set.dataset.prev, next: set.dataset.next };
+      links.forEach(function (a, i) {
+        a.addEventListener("click", function (e) {
+          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+          e.preventDefault();
+          window.lmLightbox(list, i, t);
+        });
       });
     });
   })();

@@ -337,13 +337,19 @@ export class UI {
   }
   labPanel() { const l = this.data.lab; return this.itemsPanel(l, { href: l.more_href, label: l.more }); }
   // foto dei lavori: miniature con didascalia; un clic apre la foto intera in una nuova scheda
+  // foto dei lavori: miniature con didascalia; un clic apre la galleria in sovraimpressione (window.lmLightbox, site.js)
   galleryBlock(key, title) {
     const g = this.data.gallery;
     if (!g || !g[key] || !g[key].length) return null;
+    const list = g[key].map((x) => ({ src: x.src, alt: x.alt }));
+    const labels = { close: g.close, prev: g.prev, next: g.next };
     return h("div", { class: "sp-section" },
       h("h3", { class: "sp-h" }, title),
-      h("ul", { class: "sp-gallery" }, g[key].map((x) => h("li", {},
-        h("a", { href: x.src, ...EXT }, h("img", { src: x.thumb, alt: x.alt, loading: "lazy", width: "600", height: "400" }), h("span", { class: "visually-hidden" }, " (" + this.data.ui.new_tab + ")")),
+      h("ul", { class: "sp-gallery" }, g[key].map((x, i) => h("li", {},
+        h("a", {
+          href: x.src,
+          onclick: (e) => { if (window.lmLightbox && !(e.ctrlKey || e.metaKey || e.shiftKey)) { e.preventDefault(); window.lmLightbox(list, i, labels); } },
+        }, h("img", { src: x.thumb, alt: x.alt, loading: "lazy", width: "600", height: "400" })),
         h("p", { "aria-hidden": "true" }, x.alt)))),
       h("p", { class: "note" }, g.note));
   }
