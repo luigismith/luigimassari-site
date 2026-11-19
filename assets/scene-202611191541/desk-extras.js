@@ -633,12 +633,6 @@ export function createExtras(data) {
   const hh = place(handheld(M, data.game.name), -0.125, 0.335, -0.2, root);   // si clicca: la scheda Videogames (Ctrl-Alt-Revenge e le console rimesse a nuovo)
   place(cabinet(M), 1.035, -0.27, -0.1);
   place(toolCup(M), 0.255, -0.14);
-  const notes = new THREE.Group();
-  notes.name = "notes";
-  const block = box(0.05, 0.007, 0.05, std(0xe9a23b, 0.9), 0.0015, 1);
-  block.position.y = 0.0035;
-  notes.add(block);
-  place(notes, 0.025, 0.335, 0.12);
   place(mushroomLamp(), -0.665, -0.31); // tra la stampante e il monitor
   const board = glassBoard(M, data.lab, data.ui.labels.lab);
   board.position.set(1.3 - 0.043, 1.33, -0.02);   // parete destra, rivolta verso la stanza

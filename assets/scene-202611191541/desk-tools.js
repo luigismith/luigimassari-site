@@ -381,5 +381,5 @@ export function addTools(place, M, laser) {
   place(laserPanel(ply), -0.5, 0.062, 0.06, laser);     // i pezzi tagliati al laser: si cliccano (scheda del taglio laser)
   place(fingerBox(ply), -0.49, -0.078, 0.34, laser);
   place(microphone(M), 1.0, -0.075, -0.5);
-  place(notebook(M), 0.44, 0.32, -0.1);
+  place(notebook(M), 0.74, 0.3, -0.12);   // accanto alla segreteria dei contatti
 }

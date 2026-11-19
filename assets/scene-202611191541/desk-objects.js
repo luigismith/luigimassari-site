@@ -262,14 +262,15 @@ function createMonitor(M, data) {
   const deskMat = box(0.54, 0.003, 0.2, new THREE.MeshStandardMaterial({ color: 0x343a44, roughness: 0.95 }), 0.012, 2);
   deskMat.position.set(0.05, -0.0015, 0.005);
   const mouse = new THREE.Group();
-  const mbody = new THREE.Mesh(new THREE.SphereGeometry(0.03, 24, 14), M.plastic);
-  mbody.scale.set(0.62, 0.36, 1);
-  mbody.position.y = 0.004;
+  const mbody = new THREE.Mesh(new THREE.SphereGeometry(0.058, 28, 16), M.plastic);   // un mouse vero: circa 11,5 x 7 x 3,8 cm
+  mbody.scale.set(0.6, 0.34, 1);
+  mbody.position.y = 0.0;
   const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.003, 12), M.black);
   wheel.rotation.z = Math.PI / 2;
-  wheel.position.set(0, 0.0145, -0.012);
+  wheel.scale.setScalar(1.6);
+  wheel.position.set(0, 0.0188, -0.024);
   mouse.add(mbody, wheel);
-  mouse.position.set(0.26, 0, 0.01);
+  mouse.position.set(0.265, 0, 0.012);
   mouse.rotation.y = -0.12;
   kb.add(deskMat, mouse);
   kb.position.set(0, 0.003, 0.29);   // centrata sotto il monitor
