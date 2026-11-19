@@ -183,4 +183,21 @@
     }
     if (ok && (getPref() !== "lofi" || force)) to3D();
   })();
+
+  // Scheda prodotto: un clic su una miniatura la porta nel riquadro grande. Senza JavaScript la miniatura
+  // e' un link all'immagine intera.
+  (function () {
+    var main = document.querySelector("[data-gallery-main]");
+    var thumbs = Array.prototype.slice.call(document.querySelectorAll("[data-gallery] .gallery-thumb"));
+    if (!main || !thumbs.length) return;
+    thumbs.forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;   // apri in una nuova scheda: lascia fare
+        e.preventDefault();
+        main.src = a.getAttribute("href");
+        main.alt = a.dataset.alt || "";
+        thumbs.forEach(function (t) { if (t === a) t.setAttribute("aria-current", "true"); else t.removeAttribute("aria-current"); });
+      });
+    });
+  })();
 })();

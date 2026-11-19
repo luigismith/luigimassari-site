@@ -502,8 +502,11 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
 .product-art img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 40px -28px #000; }
 .instrument-art img { width: 100%; aspect-ratio: 600 / 380; object-fit: cover; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 40px -28px #000; }
 .product-card .product-art img { aspect-ratio: 600 / 380; object-fit: cover; }
-.product-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s3); }
-.product-gallery img { aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; }
+.product-gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s3); }
+.gallery-thumb { display: block; border-radius: 5px; cursor: zoom-in; }
+.product-art .gallery-thumb img { display: block; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; opacity: .62; transition: opacity .15s; }
+.product-art .gallery-thumb:hover img, .product-art .gallery-thumb[aria-current="true"] img { opacity: 1; }
+.gallery-thumb[aria-current="true"] { outline: 2px solid var(--accent); outline-offset: 2px; cursor: default; }
 .render-note { font-size: 14px; color: var(--muted); margin-top: var(--s2); }
 
 /* Plancia della home: le quattro attivita' */
