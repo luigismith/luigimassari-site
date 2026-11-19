@@ -234,22 +234,22 @@ html.scene-mode body > .site-footer { visibility: hidden; }
   --glass: var(--sc-chip); --ring: var(--sodio); --thread: rgba(238, 241, 236, .55);
   position: absolute; left: 0; top: 0; margin-top: calc(var(--lead) * -1); z-index: 1;
   display: flex; flex-direction: column; align-items: flex-start;
-  padding: 8px 14px; white-space: nowrap; text-decoration: none;
+  padding: 5px 10px; white-space: nowrap; text-decoration: none; opacity: .7;   /* a riposo tenue: piccola e un po' trasparente */
   background: var(--glass); color: var(--serigrafia);
   border: 1px solid rgba(238, 241, 236, .3); border-radius: 10px;
   box-shadow: 0 8px 20px -12px rgba(0, 0, 0, .7);
-  font-size: 16px; font-weight: 700; font-stretch: 112%; line-height: 1.2;
+  font-size: 13px; font-weight: 700; font-stretch: 112%; line-height: 1.2;
   transition: opacity var(--t) ease, border-color var(--t) ease, box-shadow var(--t) ease, padding var(--t) ease;
 }
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .scene-tag { --glass: var(--sc-glass); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
 }
 .scene-tags.on .scene-tag { pointer-events: auto; }
-.st-name { display: flex; align-items: center; gap: 9px; font-size: inherit; transition: font-size var(--t) ease; }
-.st-name::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ring); box-shadow: 0 0 8px var(--ring); }
+.st-name { display: flex; align-items: center; gap: 7px; font-size: inherit; transition: font-size var(--t) ease; }
+.st-name::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ring); box-shadow: 0 0 6px var(--ring); }
 /* la descrizione entra aprendo la riga (0fr -> 1fr): non fa saltare il layout. A riposo non conta nella larghezza. */
 .st-hint { display: grid; grid-template-rows: 0fr; width: 0; min-width: 100%; opacity: 0; transition: grid-template-rows var(--t) ease, opacity var(--t) ease; }
-.st-hint > span { min-height: 0; overflow: hidden; padding-left: 17px; font-size: 14px; font-weight: 400; font-stretch: 100%; line-height: 1.35; color: var(--sc-muted); }
+.st-hint > span { min-height: 0; overflow: hidden; padding-left: 13px; font-size: 14px; font-weight: 400; font-stretch: 100%; line-height: 1.35; color: var(--sc-muted); }
 /* il filo e l'anellino sull'oggetto */
 .scene-tag::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: var(--lead); margin-left: -.5px; background: var(--thread); transition: background var(--t) ease; }
 .scene-tag::before {
@@ -259,7 +259,7 @@ html.scene-mode body > .site-footer { visibility: hidden; }
   box-shadow: 0 0 6px var(--ring);
   transition: transform var(--t) ease, box-shadow var(--t) ease;
 }
-.scene-tags.has-active .scene-tag { opacity: .45; }
+.scene-tags.has-active .scene-tag { opacity: .35; }
 .scene-tags .scene-tag.is-active {
   z-index: 2; opacity: 1; padding: 10px 16px 11px; font-size: 20px;
   border-color: var(--sc-accent);
