@@ -9,6 +9,113 @@ export const ROOM = {
   glassZ: -0.6,
 };
 
+// --- Poster sulla parete sinistra: tipografia e righe, tutto disegnato qui (niente immagini) ---
+// "Elettrofoni, catalogo delle macchine sonore": il titolo, una pila di forme d'onda che passano piano da sinusoide
+// a quadra (righe in rilievo, ognuna copre quella dietro) e le quattro onde di base. Ambra e rosa di sera, anni '70.
+function posterCanvas(en) {
+  const CW = 832, CH = 1184, PAD = 72, IN = CW - PAD * 2;
+  const c = canvas(CW, CH), x = c.getContext("2d");
+  const AMB = "#F2A33A", HOT = "#FF7A2E", ROSE = "#E0306F", PAPER = "#0d1119", INK = "#F1E7D3";
+  const bg = x.createLinearGradient(0, 0, 0, CH);
+  bg.addColorStop(0, "#0b1018"); bg.addColorStop(0.7, "#101520"); bg.addColorStop(1, "#1a1118");
+  x.fillStyle = bg; x.fillRect(0, 0, CW, CH);
+  for (let i = 0; i < 2600; i++) {                                  // grana della carta
+    x.fillStyle = `rgba(255, 238, 210, ${Math.random() * 0.035})`;
+    x.fillRect(Math.random() * CW, Math.random() * CH, 1.6, 1.6);
+  }
+  const mono = (size, weight = 600) => { x.font = `${weight} ${size}px ui-monospace, Consolas, "Courier New", monospace`; };
+  const track = (text, px, y, size, color, align = "left", gap = 4) => {   // testo con spaziatura larga
+    mono(size); x.fillStyle = color;
+    let w = 0; for (const ch of text) w += x.measureText(ch).width + gap; w -= gap;
+    let cx = align === "left" ? px : align === "right" ? px - w : px - w / 2;
+    x.textAlign = "left"; x.textBaseline = "alphabetic";
+    for (const ch of text) { x.fillText(ch, cx, y); cx += x.measureText(ch).width + gap; }
+  };
+  // testata: tre strisce e la sigla del foglio
+  [[AMB, 0], [HOT, 11], [ROSE, 22]].forEach(([col, dy]) => { x.fillStyle = col; x.fillRect(PAD, 62 + dy, 92, 6); });
+  track(en ? "CATALOGUE  VOL. I" : "CATALOGO  VOL. I", CW - PAD, 80, 24, "rgba(241, 231, 211, 0.62)", "right", 5);
+  // titolo: il corpo piu' grande con cui sta in una riga
+  x.textAlign = "left"; x.textBaseline = "alphabetic";
+  let size = 130; do { size -= 4; x.font = `800 ${size}px ${FONT}`; } while (x.measureText("ELETTROFONI").width > IN && size > 40);
+  x.fillStyle = INK; x.fillText("ELETTROFONI", PAD - 3, 214);
+  x.fillStyle = AMB; x.fillRect(PAD, 244, IN, 3);
+  x.fillStyle = "rgba(241, 231, 211, 0.9)"; x.font = `500 38px ${FONT}`;
+  x.fillText(en ? "catalogue of sound machines" : "catalogo delle macchine sonore", PAD, 298);
+
+  // pila di forme d'onda: a ogni riga la forma cambia un poco, dalla sinusoide alla quadra
+  const shapes = [
+    (p) => Math.sin(p),
+    (p) => (2 / Math.PI) * Math.asin(Math.sin(p)),
+    (p) => 2 * (((p / (2 * Math.PI)) % 1 + 1) % 1) - 1,
+    (p) => Math.tanh(4.2 * Math.sin(p)),
+  ];
+  const N = 17, top = 380, step = 27, amp = 40, x0 = PAD, x1 = CW - PAD;
+  for (let i = 0; i < N; i++) {
+    const m = (i / (N - 1)) * (shapes.length - 1), a = Math.min(Math.floor(m), shapes.length - 2), f = m - a;
+    const y0 = top + i * step, ph = 0.35 + i * 0.05;
+    const wave = (px) => {
+      const p = ((px - x0) / (x1 - x0)) * Math.PI * 2 * 3 + ph;
+      return y0 - amp * ((1 - f) * shapes[a](p) + f * shapes[a + 1](p)) * (0.55 + 0.45 * Math.sin(((px - x0) / (x1 - x0)) * Math.PI));
+    };
+    x.beginPath(); x.moveTo(x0, y0 + 90);
+    for (let px = x0; px <= x1; px += 3) x.lineTo(px, wave(px));
+    x.lineTo(x1, y0 + 90); x.closePath();
+    x.fillStyle = PAPER; x.fill();                                   // la riga copre quelle dietro
+    const t = i / (N - 1);
+    x.beginPath();
+    for (let px = x0; px <= x1; px += 3) (px === x0 ? x.moveTo(px, wave(px)) : x.lineTo(px, wave(px)));
+    x.lineWidth = 3.2; x.lineJoin = "round";
+    x.strokeStyle = t < 0.5 ? `rgba(242, 163, 58, ${0.5 + t})` : `rgba(${Math.round(255 - (t - 0.5) * 70)}, ${Math.round(150 - (t - 0.5) * 190)}, ${Math.round(58 + (t - 0.5) * 100)}, 0.98)`;
+    x.stroke();
+  }
+  // le quattro onde di base, ognuna con il suo nome
+  const names = en ? ["SINE", "TRIANGLE", "SAWTOOTH", "SQUARE"] : ["SINUSOIDE", "TRIANGOLARE", "DENTE DI SEGA", "ONDA QUADRA"];
+  const colW = IN / 4, baseY = 928;
+  x.fillStyle = "rgba(241, 231, 211, 0.22)"; x.fillRect(PAD, baseY - 66, IN, 2);
+  names.forEach((nm, i) => {
+    const cx0 = PAD + i * colW + 6, w = colW - 36;
+    x.beginPath();
+    for (let px = 0; px <= w; px += 2) {
+      const p = (px / w) * Math.PI * 4, v = shapes[i](p);
+      (px === 0 ? x.moveTo : x.lineTo).call(x, cx0 + px, baseY - 6 - v * 26);
+    }
+    x.lineWidth = 4.5; x.lineJoin = "round"; x.strokeStyle = i % 2 ? HOT : AMB; x.stroke();
+    track(`0${i + 1}`, cx0, baseY + 52, 20, ROSE, "left", 3);
+    track(nm, cx0, baseY + 82, nm.length > 10 ? 15 : 18, "rgba(241, 231, 211, 0.82)", "left", 1.5);
+  });
+  // in fondo: i blocchi di una macchina sonora e le tre strisce
+  x.fillStyle = "rgba(241, 231, 211, 0.22)"; x.fillRect(PAD, 1040, IN, 2);
+  track(en ? "OSCILLATOR - FILTER - ENVELOPE - SEQUENCER" : "OSCILLATORE - FILTRO - INVILUPPO - SEQUENCER", PAD, 1086, 19, "rgba(241, 231, 211, 0.72)", "left", 2);
+  [[AMB, 0], [HOT, 11], [ROSE, 22]].forEach(([col, dy]) => { x.fillStyle = col; x.fillRect(PAD, 1112 + dy, IN, 6); });
+  return c;
+}
+
+function posterWall(frameMat, glowMat) {
+  const g = new THREE.Group();
+  g.name = "poster";
+  const W = 0.52, H = 0.74;
+  const en = (document.documentElement.lang || "it").startsWith("en");
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, map: tex(posterCanvas(en)) });
+  material.emissiveMap = material.map; material.emissive = new THREE.Color(0xffffff); material.emissiveIntensity = 0.5;
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(W, H), material);
+  sheet.position.z = 0.012;
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.03, H + 0.03, 0.02), frameMat);   // cornice nera sottile
+  frame.position.z = 0.002;
+  const light = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 0.006, 0.006), glowMat);       // filo di luce ambra sopra
+  light.position.set(0, H / 2 + 0.034, 0.014);
+  // la luce ambra sbava un poco sul muro, solo di sera
+  const gc = canvas(128, 128), gx = gc.getContext("2d"), gg = gx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gg.addColorStop(0, "rgba(255, 150, 60, 0.55)"); gg.addColorStop(0.55, "rgba(255, 120, 40, 0.16)"); gg.addColorStop(1, "rgba(255, 110, 40, 0)");
+  gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
+  const spill = new THREE.Mesh(new THREE.PlaneGeometry(W * 2.3, H * 1.9), new THREE.MeshBasicMaterial({ map: tex(gc, { mips: false }), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.22 }));
+  spill.position.z = 0.0015;
+  spill.renderOrder = 1;
+  g.add(spill, frame, sheet, light);
+  g.userData.material = material;
+  g.userData.spill = spill.material;
+  return g;
+}
+
 // --- Shader del vetro: fuori (cielo, costa, luci, acqua) + gocce -----------
 const GLASS_VERT = /* glsl */ `
 varying vec2 vUv;
@@ -84,8 +191,8 @@ float coast(float az) {
 // --- Taranto: il canale navigabile con il ponte girevole e il castello aragonese ---------------
 // u = distanza dal centro del canale in mezze larghezze: |u| < 1 e' acqua (dietro, il Mar Grande).
 // A sinistra il borgo con i suoi isolati, a destra la citta' vecchia con le torri tonde del castello.
-const float AZB = 0.42;            // azimut del centro del canale
-const float HWB = 0.075;           // meta' larghezza del canale
+const float AZB = 0.165;           // azimut del centro del canale: nella vista frontale cade nel riquadro destro della vetrata, sopra la proiezione del meteo (se si sposta, vedi FACING in sky.js)
+const float HWB = 0.064;           // meta' larghezza del canale
 const float DECK = 0.017;          // quota dell'impalcato sopra l'acqua
 float townU(float az) { return (az - AZB) / HWB; }
 float townK(float u) { return 1.0 - smoothstep(2.3, 3.1, abs(u)); }
@@ -220,7 +327,7 @@ vec3 redLights(float az, float el, float blur, float t) {
   float rad = 0.0013 + blur * 0.0015;
   for (int i = 0; i < 4; i++) {
     float fi = float(i);
-    float a = i == 0 ? -0.42 : i == 1 ? -0.15 : i == 2 ? 0.13 : 0.262;   // mai sopra il canale: li' non c'e' niente che la regga
+    float a = i == 0 ? -0.42 : i == 1 ? -0.15 : i == 2 ? 0.031 : 0.376;   // mai sopra il canale ne' sul castello (AZB 0.165): li' non c'e' niente che li regga
     float e = skyline(a) + 0.0045;                                        // appena sopra un crinale o un tetto: un'antenna
     vec2 d = vec2(az - a, el - e);
     float on = smoothstep(0.0, 0.08, fract(t * 0.45 + fi * 0.31)) * (1.0 - smoothstep(0.42, 0.52, fract(t * 0.45 + fi * 0.31)));
@@ -594,27 +701,28 @@ export function createRoom(ctx) {
   back.receiveShadow = true;
   group.add(back);
 
-  const sideGeo = new THREE.PlaneGeometry(3.2, height);
+  const DEPTH = 4.1;                      // la stanza arriva fin dietro la camera della vista d'insieme
+  const sideGeo = new THREE.PlaneGeometry(DEPTH, height);
   const rightWall = new THREE.Mesh(sideGeo, wallMat);
   rightWall.rotation.y = -Math.PI / 2;
-  rightWall.position.set(right, height / 2, wallZ + 1.6);
+  rightWall.position.set(right, height / 2, wallZ + DEPTH / 2);
   rightWall.receiveShadow = true;
   group.add(rightWall);
   const leftWall = new THREE.Mesh(sideGeo, wallMat);
   leftWall.rotation.y = Math.PI / 2;
-  leftWall.position.set(left, height / 2, wallZ + 1.6);
+  leftWall.position.set(left, height / 2, wallZ + DEPTH / 2);
   group.add(leftWall);
 
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.8 });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), floorMat);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.2, DEPTH), floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set((left + right) / 2, 0, wallZ + 1.7);
+  floor.position.set((left + right) / 2, 0, wallZ + DEPTH / 2);
   floor.receiveShadow = true;
   group.add(floor);
   const ceilMat = new THREE.MeshStandardMaterial({ color: 0x1d2026, roughness: 1 });
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), ceilMat);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.2, DEPTH), ceilMat);
   ceil.rotation.x = Math.PI / 2;
-  ceil.position.set((left + right) / 2, height, wallZ + 1.7);
+  ceil.position.set((left + right) / 2, height, wallZ + DEPTH / 2);
   group.add(ceil);
 
   // vetrata panoramica: telaio sottile in metallo nero, due montanti
@@ -761,6 +869,12 @@ void main() {
   cove.position.set(cx, win.y1 + 0.03, wallZ + 0.004);
   group.add(cove);
 
+  // parete sinistra: un poster, con il suo filo di luce
+  const poster = posterWall(frameMat, cove.material);
+  poster.position.set(left + 0.004, 1.34, 0.78);
+  poster.rotation.y = Math.PI / 2;
+  group.add(poster);
+
   // luce fredda dalla finestra
   const moon = new THREE.DirectionalLight(0x5f86d8, 0.6);
   moon.position.set(-0.6, 2.6, -3.2);
@@ -829,6 +943,9 @@ void main() {
       wallMat.color.setScalar(L(1, 3.3, k));
       floorMat.color.lerpColors(NIGHT.floor, DAY.floor, k);
       ceilMat.color.lerpColors(NIGHT.ceil, DAY.ceil, k);
+      poster.userData.material.color.setScalar(L(1, 2.1, k));            // la carta prende luce come il muro
+      poster.userData.material.emissiveIntensity = L(0.5, 0.06, k);
+      poster.userData.spill.opacity = L(0.22, 0, k);
       cove.material.color.setRGB(L(2.2, 0.9, k), L(1.3, 0.6, k), L(0.45, 0.3, k));
     },
     update(t) {

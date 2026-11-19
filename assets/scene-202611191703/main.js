@@ -19,7 +19,7 @@ import { heavens } from "./sky.js";
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const VIEWS = {
-  overview: { pos: V(-0.64, 1.6, 2.02), target: V(-0.02, 1.02, -0.14), fov: 41 },
+  overview: { pos: V(-0.07, 1.7, 2.5), target: V(-0.07, 0.95, -0.1), fov: 44, turn: { yaw: Math.PI / 180 * 38, pivot: 0.4 } },
   dev: { pos: V(-0.06, 1.24, 1.5), target: V(-0.15, 1.07, -0.2), fov: 40 },
   print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
   shop: { pos: V(0.64, 1.42, 1.0), target: V(0.64, 0.8, -0.08), fov: 40 },     // anche Stame, appoggiato al gradino
@@ -249,15 +249,47 @@ export async function start({ data, root, force, toLofi }) {
   const tagLayer = root.querySelector("[data-scene-tags]");
   const tags = [];
   tagLayer.inert = true;
+  // ogni etichetta: nome + descrizione brevissima (visibile solo da attiva). Il nome accessibile e' "nome, descrizione".
   function addTag(view, point, lead) {
+    const name = data.ui.labels[view], hint = (data.ui.label_hints || {})[view] || "";
     const a = document.createElement("a");
     a.className = "scene-tag";
     a.href = "#" + data.hash[view];
-    a.textContent = data.ui.labels[view];
+    a.dataset.view = view;
+    if (hint) a.setAttribute("aria-label", name + ", " + hint);
+    const n = document.createElement("span");
+    n.className = "st-name";
+    n.textContent = name;
+    a.appendChild(n);
+    if (hint) {
+      const h = document.createElement("span");
+      h.className = "st-hint";
+      const hi = document.createElement("span");
+      hi.textContent = hint;
+      h.appendChild(hi);
+      a.appendChild(h);
+    }
     a.style.setProperty("--lead", lead + "px");
     tagLayer.appendChild(a);
-    tags.push({ a, point });
+    tags.push({ a, point, view });
   }
+  // etichetta attiva: mouse sulla targhetta, focus da tastiera o mouse sull'oggetto 3D della stessa sezione
+  const tagSrc = { over: null, focus: null, object: null };
+  function refreshTags() {
+    let v = tagSrc.over || tagSrc.focus || tagSrc.object;
+    if (!tags.some((t) => t.view === v)) v = null; // la cuffia non ha etichetta
+    tagLayer.classList.toggle("has-active", !!v);
+    for (const t of tags) t.a.classList.toggle("is-active", t.view === v);
+  }
+  function setTagSrc(key, view) {
+    if (tagSrc[key] === view) return;
+    tagSrc[key] = view;
+    refreshTags();
+  }
+  tagLayer.addEventListener("pointerover", (e) => { const a = e.target.closest(".scene-tag"); setTagSrc("over", a ? a.dataset.view : null); });
+  tagLayer.addEventListener("pointerout", (e) => { if (!(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".scene-tag"))) setTagSrc("over", null); });
+  tagLayer.addEventListener("focusin", (e) => { const a = e.target.closest(".scene-tag"); setTagSrc("focus", a && a.matches(":focus-visible") ? a.dataset.view : null); });
+  tagLayer.addEventListener("focusout", () => setTagSrc("focus", null));
   const hitOf = (view) => hits.filter((m) => m.userData.view === view);
   addTag("dev", hitOf("dev")[0].userData.top, 26);
   addTag("print", hitOf("print")[0].userData.top, 24);
@@ -275,7 +307,10 @@ export async function start({ data, root, force, toLofi }) {
   const TAG_MIN_Y = 132; // px dal bordo alto: barra (circa 80) + altezza dell'etichetta
   function updateTags() {
     const on = state.entered && state.view === "overview" && !rig.moving;
-    if (tagLayer.classList.contains("on") !== on) { tagLayer.classList.toggle("on", on); tagLayer.inert = !on; }
+    if (tagLayer.classList.contains("on") !== on) {
+      tagLayer.classList.toggle("on", on); tagLayer.inert = !on;
+      if (!on) { tagSrc.over = tagSrc.focus = tagSrc.object = null; refreshTags(); }
+    }
     if (!on) return;
     for (const t of tags) {
       tagPos.copy(t.point).project(camera);
@@ -394,6 +429,7 @@ export async function start({ data, root, force, toLofi }) {
     root.classList.toggle("is-hover", !!m);
     outline.enabled = !!m;
     outline.selectedObjects = m ? [m.userData.obj] : [];
+    setTagSrc("object", m ? m.userData.view : null); // accende l'etichetta della sezione (nessuna per la cuffia)
     if (!m) ui.hideLabel();
   }
   const tmp = new THREE.Vector3();
