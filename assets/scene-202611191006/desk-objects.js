@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createIchosynth } from "./ichosynth.js";
+import { createStame } from "./stame.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
@@ -604,13 +605,13 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const spots = {
     ichosynth: [0.47, -0.24, 0.05, DESK.y + 0.07],
     "open-orc": [0.81, -0.24, -0.1, DESK.y + 0.07],
-    stame: [0.53, 0.15, -0.05],
+    stame: [0.585, 0.262, -0.04],          // sul banco davanti al gradino, dove prima c'era una tastiera MIDI: Stame la contiene
   };
   const synths = [];
   let i = 0;
   for (const p of data.shop.products) {
-    // Ichosynth ha il suo modello (la griglia di LED non e' un frontale con le manopole); gli altri nascono dal frontale SVG
-    const s = p.slug === "ichosynth" ? createIchosynth(M, p) : await createSynth(M, p, ledMats);
+    // Ichosynth e Stame hanno il loro modello, fatto sulle misure vere; gli altri nascono dal frontale SVG
+    const s = p.slug === "ichosynth" ? createIchosynth(M, p) : p.slug === "stame" ? createStame(M, p) : await createSynth(M, p, ledMats);
     if (s.update) updaters.push(s.update);
     const [x, z, ry, y] = spots[p.slug] || [0.3 + i * 0.2, 0.0, 0];
     place(s.group, x, z, ry, y ?? DESK.y);
@@ -644,7 +645,8 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const a2 = jackW("stame", 0);
   const recIn = recorder.group.localToWorld(V(-0.1125, 0.032, 0.035));
   const recOut = recorder.group.localToWorld(V(-0.15, 0.032, 0.035));
-  if (a2) root.add(patchCable(M, 0xf2a33a, [a2, up(a2, 0.04), V(a2.x + 0.06, Y + 0.03, a2.z + 0.09), V(0.84, Y + 0.004, 0.27), V(recOut.x - 0.02, Y + 0.006, recOut.z + 0.05), recOut, recIn]));
+  // dall'uscita sul retro di Stame al registratore, che gli sta accanto: un arco corto dietro la console
+  if (a2) root.add(patchCable(M, 0xf2a33a, [a2, V(a2.x, a2.y + 0.004, a2.z - 0.025), up(a2.clone().lerp(recOut, 0.5).add(V(0, 0, -0.03)), 0.05), up(recOut, 0.03), recOut, recIn]));
   const a3 = jackW("open-orc", 1);
   if (a3) root.add(patchCable(M, 0xe9ece6, [a3, up(a3, 0.03), V(a3.x + 0.05, Y + 0.09, -0.36), V(a3.x + 0.12, Y + 0.004, -0.3), V(a3.x + 0.16, Y + 0.004, -0.2), V(a3.x + 0.12, Y + 0.004, -0.15)]));
   onProgress(1);

@@ -22,7 +22,7 @@ export const VIEWS = {
   overview: { pos: V(-0.64, 1.6, 2.02), target: V(-0.02, 1.02, -0.14), fov: 41 },
   dev: { pos: V(-0.06, 1.24, 1.5), target: V(-0.15, 1.07, -0.2), fov: 40 },
   print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
-  shop: { pos: V(0.6, 1.42, 0.98), target: V(0.6, 0.84, -0.04), fov: 40 },
+  shop: { pos: V(0.64, 1.5, 1.12), target: V(0.64, 0.8, 0.0), fov: 40 },      // anche Stame, che sta davanti al gradino
   about: { pos: V(0.06, 1.2, 0.5), target: V(0.11, 0.77, 0.06), fov: 40 },
   contact: { pos: V(0.9, 1.08, 0.66), target: V(0.98, 0.8, 0.12), fov: 40 },
   lab: { pos: V(0.02, 1.36, 0.1), target: V(1.3, 1.33, -0.2), fov: 42 },
@@ -321,7 +321,10 @@ export async function start({ data, root, force, toLofi }) {
   ui.on("back", back);
   ui.on("lofi", () => toLofi());
   // il suono si comanda dal pulsante, dalla scelta all'ingresso e dalla cuffia sul banco: lo stato e' uno solo
-  const setSound = (on) => { audio.setEnabled(on); ui.setSound(on); extras.headphones.userData.setOn(on); };
+  const setSound = (on) => {
+    audio.setEnabled(on); ui.setSound(on); extras.headphones.userData.setOn(on);
+    try { sessionStorage.setItem("lm-entered", on ? "1" : "0"); } catch (e) { /* storage bloccato */ }
+  };
   ui.on("sound", setSound);
   ui.bindControls();
 
@@ -482,10 +485,20 @@ export async function start({ data, root, force, toLofi }) {
     toLofi({ auto: true, message: data.ui.too_slow });
     return api;
   }
-  ui.ready(({ sound }) => {
+  ui.ready(({ sound, auto }) => {
     state.entered = true;
-    audio.setEnabled(sound);
-    ui.setSound(sound);
+    if (auto && sound) {
+      // senza un gesto il browser non lascia partire l'audio: il suono resta scelto e parte al primo tocco o tasto
+      // (in cattura, prima del clic: toccare subito la cuffia la spegne, come ci si aspetta)
+      ui.setSound(true);
+      extras.headphones.userData.setOn(true);
+      const start = () => { removeEventListener("pointerdown", start, true); removeEventListener("keydown", start, true); audio.setEnabled(true); };
+      addEventListener("pointerdown", start, true);
+      addEventListener("keydown", start, true);
+    } else {
+      audio.setEnabled(sound);
+      ui.setSound(sound);
+    }
     ui.setView("overview");
     // si arriva sulla plancia (il banco intero con le sezioni); un hash nell'URL apre subito quella sezione
     const v = hashView();

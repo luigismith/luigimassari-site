@@ -77,13 +77,20 @@ export class UI {
     });
   }
 
+  // Chi e' gia' entrato in questa sessione del browser (per esempio torna alla home dal nome nell'intestazione
+  // di una pagina classica) arriva direttamente sul banco, con la scelta del suono fatta all'ingresso.
   ready(onEnter) {
+    let saved = null;
+    try { saved = sessionStorage.getItem("lm-entered"); } catch (e) { /* storage bloccato */ }
+    const go = (auto) => {
+      try { sessionStorage.setItem("lm-entered", this.sound ? "1" : "0"); } catch (e) { /* storage bloccato */ }
+      this.root.classList.remove("is-intro");
+      onEnter({ sound: this.sound, auto });
+    };
+    if (saved === "1" || saved === "0") { this.sound = saved === "1"; go(true); return; }
     this.enterBtn.disabled = false;
     this.enterBtn.focus({ preventScroll: true });
-    this.enterBtn.addEventListener("click", () => {
-      this.root.classList.remove("is-intro");
-      onEnter({ sound: this.sound });
-    }, { once: true });
+    this.enterBtn.addEventListener("click", () => go(false), { once: true });
   }
 
   bindControls() {

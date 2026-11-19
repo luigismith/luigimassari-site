@@ -1,4 +1,4 @@
-// Altri oggetti sul banco: tastiera MIDI, cuffie, console portatile, cassettiera dei componenti,
+// Altri oggetti sul banco: cuffie, console portatile, cassettiera dei componenti,
 // breadboard, multimetro, portautensili, blocchetto. Non sono sezioni del sito: riempiono il banco.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -13,37 +13,6 @@ const lit = (r, g, b) => { // materiale luminoso (non risente delle luci); condi
   if (!litCache.has(key)) litCache.set(key, new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b) }));
   return litCache.get(key);
 };
-
-// tastiera MIDI a 25 tasti con pad e manopole (senza marchi)
-function midiKeyboard(M) {
-  const g = new THREE.Group();
-  g.name = "midi";
-  const W = 0.34, D = 0.118, H = 0.02;
-  const body = box(W, H, D, M.dark, 0.005, 2);
-  body.position.y = H / 2;
-  g.add(body);
-  const kw = 0.0212, left = -kw * 7.5, m4 = new THREE.Matrix4();
-  const white = new THREE.InstancedMesh(new RoundedBoxGeometry(kw - 0.0012, 0.008, 0.052, 1, 0.0012), std(0xdfe3e0, 0.38), 15);
-  for (let i = 0; i < 15; i++) white.setMatrixAt(i, m4.makeTranslation(left + kw * (i + 0.5), H + 0.003, 0.028));
-  const blacks = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12];
-  const black = new THREE.InstancedMesh(new RoundedBoxGeometry(0.0115, 0.008, 0.031, 1, 0.0012), std(0x101214, 0.4), blacks.length);
-  blacks.forEach((k, i) => black.setMatrixAt(i, m4.makeTranslation(left + kw * (k + 1), H + 0.008, 0.017)));
-  const pad = new THREE.InstancedMesh(new RoundedBoxGeometry(0.023, 0.005, 0.02, 1, 0.002), std(0x2c323a, 0.75), 8);
-  for (let i = 0; i < 8; i++) pad.setMatrixAt(i, m4.makeTranslation(-0.148 + (i % 4) * 0.028, H + 0.002, -0.044 + Math.floor(i / 4) * 0.025));
-  g.add(white, black, pad);
-  const padOn = new THREE.Mesh(new THREE.BoxGeometry(0.019, 0.001, 0.016), lit(1.6, 0.95, 0.3));
-  padOn.position.set(-0.12, H + 0.0048, -0.044);
-  const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.012), lit(0.9, 0.55, 0.18));
-  disp.rotation.x = -Math.PI / 2;
-  disp.position.set(-0.03, H + 0.0006, -0.033);
-  g.add(padOn, disp);
-  for (let i = 0; i < 4; i++) {
-    const k = knob3d(M, 0.0085, 0.011, -100 + i * 65);
-    k.position.set(0.012 + i * 0.036, H, -0.033);
-    g.add(k);
-  }
-  return g;
-}
 
 // cuffie appoggiate sul banco
 function headphones(M) {
@@ -659,7 +628,6 @@ export function createExtras(data) {
   const printerObj = printer(M);
   place(printerObj.group, -0.9, 0.08, 0.28, root);
   place(prints(), -0.63, 0.1, 0.4);
-  place(midiKeyboard(M), 0.6, 0.335, 0.03);
   const hp = place(headphones(M), -0.6, 0.33, 0.5, root);
   place(handheld(M, data.about.projects[0][0]), -0.125, 0.335, -0.2);
   place(cabinet(M), 1.035, -0.27, -0.1);
