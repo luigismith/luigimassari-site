@@ -631,7 +631,6 @@ export function createExtras(data) {
   const hp = place(headphones(M), -0.68, 0.29, 0.35, root);   // davanti alla stampante, tutta sul banco
   hp.scale.setScalar(0.75);
   const hh = place(handheld(M, data.game.name), -0.125, 0.335, -0.2, root);   // si clicca: la scheda Videogames (Ctrl-Alt-Revenge e le console rimesse a nuovo)
-  place(cabinet(M), 1.035, -0.27, -0.1);
   place(toolCup(M), 0.255, -0.14);
   place(mushroomLamp(), -0.665, -0.31); // tra la stampante e il monitor
   const board = glassBoard(M, data.lab, data.ui.labels.lab);

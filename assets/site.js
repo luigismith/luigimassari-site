@@ -258,39 +258,126 @@
     });
   })();
 
-  // Portfolio: filtri per area e galleria sfogliabile di lavoro in lavoro (le foto dei lavori visibili, in fila).
-  // Usato dalla pagina /portfolio/ e dal pannello del profilo nella scena (window.lmPortfolio).
+  // Portfolio: ogni lavoro si apre in una scheda grande (foto, racconto, tecniche, link) e da li' si passa al lavoro
+  // precedente o successivo. window.lmWorks(lavori, indice, testi, { hash }) la apre anche dalla scena 3D.
+  // lavori: [{ s: slug, c: area, t: titolo, d: riga, p: [paragrafi], g: [tecniche], i: [foto], m: [miniature], l: link, x: esterno, a: contatti }]
   (function () {
-    window.lmPortfolio = function (works, start, t) {
-      var list = [], first = 0;
-      works.forEach(function (w, k) {
-        if (k === start) first = list.length;
-        w.i.forEach(function (src, n) { list.push({ src: src, alt: w.t + (n === 0 ? " — " + w.d : "") }); });
+    if (typeof HTMLDialogElement === "undefined") return;
+    var d = null, E = {}, works = [], wi = 0, pi = 0, L = {}, opener = null, useHash = false;
+    function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+    function build() {
+      d = el("dialog", "pfv");
+      E.close = el("button", "pfv-close"); E.close.type = "button";
+      var media = el("div", "pfv-media");
+      E.img = el("img"); E.cover = el("div", "pfv-cover");
+      E.pp = el("button", "pfv-ph pfv-ph-prev", "‹"); E.pn = el("button", "pfv-ph pfv-ph-next", "›"); E.pp.type = E.pn.type = "button";
+      E.thumbs = el("ul", "pfv-thumbs");
+      media.append(E.img, E.cover, E.pp, E.pn, E.thumbs);
+      var text = el("div", "pfv-text");
+      E.cat = el("p", "pfv-cat"); E.title = el("h2", "pfv-title"); E.title.tabIndex = -1; E.lede = el("p", "pfv-lede"); E.body = el("div", "pfv-body");
+      E.tags = el("ul", "pfv-tags"); E.actions = el("div", "pfv-actions");
+      E.link = el("a", "btn btn-primary"); E.ask = el("a", "btn btn-secondary"); E.actions.append(E.link, E.ask);
+      var nav = el("div", "pfv-nav");
+      E.wp = el("button", "pfv-work"); E.wn = el("button", "pfv-work"); E.wp.type = E.wn.type = "button"; E.n = el("span", "pfv-n");
+      nav.append(E.wp, E.n, E.wn);
+      text.append(E.cat, E.title, E.lede, E.body, E.tags, E.actions, nav);
+      d.append(E.close, media, text);
+      document.body.appendChild(d);
+      E.close.addEventListener("click", function () { d.close(); });
+      E.pp.addEventListener("click", function () { step(-1); });
+      E.pn.addEventListener("click", function () { step(1); });
+      E.wp.addEventListener("click", function () { showWork(wi - 1, 0); });
+      E.wn.addEventListener("click", function () { showWork(wi + 1, 0); });
+      d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+      d.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+        else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
       });
-      if (window.lmLightbox && list.length) window.lmLightbox(list, first, t);
+      d.addEventListener("close", function () {
+        if (useHash) history.replaceState(null, "", location.pathname + location.search);
+        if (opener && opener.focus) opener.focus();
+      });
+    }
+    // avanti e indietro: prima le foto del lavoro, poi il lavoro accanto
+    function step(k) {
+      var n = works[wi].i.length;
+      if (k > 0) { if (pi < n - 1) showPhoto(pi + 1); else showWork(wi + 1, 0); }
+      else if (pi > 0) showPhoto(pi - 1); else showWork(wi - 1, -1);
+    }
+    function showPhoto(k) {
+      var w = works[wi];
+      pi = k;
+      E.img.src = w.i[pi]; E.img.alt = w.t;
+      Array.prototype.forEach.call(E.thumbs.children, function (li, i) { li.firstChild.setAttribute("aria-current", String(i === pi)); });
+    }
+    function showWork(k, photo) {
+      wi = (k + works.length) % works.length;
+      var w = works[wi], many = w.i.length > 1;
+      E.cat.textContent = w.c + (w.o && L.openTag ? " · " + L.openTag : ""); E.title.textContent = w.t; E.lede.textContent = w.d;
+      E.body.replaceChildren.apply(E.body, w.p.map(function (x) { return el("p", null, x); }));
+      E.tags.replaceChildren.apply(E.tags, w.g.map(function (x) { return el("li", null, x); }));
+      E.link.hidden = !w.l;
+      if (w.l) { E.link.href = w.l; E.link.textContent = L.open + (w.x ? " ↗" : ""); if (w.x) { E.link.target = "_blank"; E.link.rel = "noopener"; } else { E.link.removeAttribute("target"); E.link.removeAttribute("rel"); } }
+      E.ask.href = w.a; E.ask.textContent = L.ask;
+      E.n.textContent = (wi + 1) + " " + L.of + " " + works.length;
+      E.wp.textContent = "← " + works[(wi - 1 + works.length) % works.length].t;
+      E.wn.textContent = works[(wi + 1) % works.length].t + " →";
+      E.wp.setAttribute("aria-label", L.prevWork + ": " + works[(wi - 1 + works.length) % works.length].t);
+      E.wn.setAttribute("aria-label", L.nextWork + ": " + works[(wi + 1) % works.length].t);
+      E.img.hidden = !w.i.length; E.cover.hidden = !!w.i.length; E.cover.textContent = w.t;
+      E.pp.hidden = E.pn.hidden = works.length < 2 && !many;
+      E.thumbs.hidden = !many;
+      E.thumbs.replaceChildren.apply(E.thumbs, many ? w.m.map(function (src, i) {
+        var li = el("li"), b = el("button"), im = el("img");
+        b.type = "button"; im.src = src; im.alt = ""; b.setAttribute("aria-label", w.t + ", " + (i + 1)); b.appendChild(im); li.appendChild(b);
+        b.addEventListener("click", function () { showPhoto(i); });
+        return li;
+      }) : []);
+      if (w.i.length) showPhoto(photo < 0 ? w.i.length - 1 : photo || 0); else pi = 0;
+      d.querySelector(".pfv-text").scrollTop = 0;
+      if (useHash) history.replaceState(null, "", "#" + w.s);
+    }
+    window.lmWorks = function (list, index, labels, opts) {
+      if (!list.length) return;
+      if (!d) build();
+      works = list; L = labels || {}; useHash = !!(opts && opts.hash);
+      E.close.textContent = L.close || "×";
+      E.pp.setAttribute("aria-label", L.prevPhoto || ""); E.pn.setAttribute("aria-label", L.nextPhoto || "");
+      opener = document.activeElement;
+      showWork(Math.max(0, index || 0), 0);
+      if (!d.open) d.showModal();
+      E.title.focus({ preventScroll: true });
     };
+
+    // la pagina /portfolio/: filtri per area, schede che aprono il lavoro, indirizzo #lavoro che lo apre subito
     var root = document.querySelector("[data-portfolio]");
     if (!root) return;
+    root.classList.add("is-js");
     var data = JSON.parse(root.querySelector("[data-portfolio-data]").textContent);
-    var t = { close: root.dataset.close, prev: root.dataset.prev, next: root.dataset.next };
+    var labels = JSON.parse(root.querySelector("[data-portfolio-labels]").textContent);
     var cards = Array.prototype.slice.call(root.querySelectorAll(".pf-card"));
     var buttons = Array.prototype.slice.call(root.querySelectorAll("[data-filter]"));
-    function visible() { return cards.filter(function (c) { return !c.hidden; }); }
+    function visible() { return cards.filter(function (c) { return !c.hidden; }).map(function (c) { return +c.dataset.index; }); }
     buttons.forEach(function (b) {
       b.addEventListener("click", function () {
         var f = b.dataset.filter;
         buttons.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-        cards.forEach(function (c) { c.hidden = !!f && c.dataset.cat !== f; });
+        cards.forEach(function (c) { c.hidden = !!f && (f === "open" ? !("open" in c.dataset) : c.dataset.cat !== f); });
       });
     });
     root.querySelectorAll("a[data-work]").forEach(function (a) {
       a.addEventListener("click", function (e) {
-        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button || !window.lmLightbox) return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
         e.preventDefault();
-        var vis = visible().map(function (c) { return +c.dataset.index; }).filter(function (k) { return data[k].i.length; });
-        var works = vis.map(function (k) { return data[k]; });
-        window.lmPortfolio(works, vis.indexOf(+a.dataset.work), t);
+        var vis = visible();
+        window.lmWorks(vis.map(function (k) { return data[k]; }), vis.indexOf(+a.dataset.work), labels, { hash: true });
       });
     });
+    function fromHash() {
+      var s = decodeURIComponent(location.hash.slice(1)), k = data.findIndex(function (w) { return w.s === s; });
+      if (k >= 0) window.lmWorks(data, k, labels, { hash: true });
+    }
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
   })();
 })();

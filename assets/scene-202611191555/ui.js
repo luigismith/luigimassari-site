@@ -258,27 +258,30 @@ export class UI {
     card.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }
 
+  // il tablet: il portfolio (tutti i lavori, ognuno si apre nella sua scheda) e sotto il profilo
   aboutPanel() {
-    const a = this.data.about, hash = this.data.hash;
+    const a = this.data.about, hash = this.data.hash, pf = a.portfolio;
+    const open = (i) => (e) => { if (window.lmWorks) { e.preventDefault(); window.lmWorks(pf.works, i, pf.labels); } };
     return [
       this.title(a.h),
-      ...a.p.map((p, i) => h("p", { class: i === 0 ? "lead" : null }, p)),
-      a.portfolio ? h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, a.portfolio.h),
-        h("p", {}, a.portfolio.p),
-        h("ul", { class: "sp-gallery" }, a.portfolio.works.filter((w) => w.i.length).slice(0, 6).map((w, i, arr) => h("li", {},
-          h("a", { href: a.portfolio.page, onclick: (e) => { if (window.lmPortfolio) { e.preventDefault(); const all = a.portfolio.works.filter((x) => x.i.length); window.lmPortfolio(all, all.indexOf(w), { close: this.data.gallery.close, prev: this.data.gallery.prev, next: this.data.gallery.next }); } } },
-            h("img", { src: w.thumb, alt: w.t, loading: "lazy", width: "600", height: "400" })),
-          h("p", { "aria-hidden": "true" }, w.t)))),
-        h("div", { class: "sp-actions" },
-          h("button", { type: "button", class: "btn btn-primary", onclick: () => { const all = a.portfolio.works.filter((x) => x.i.length); window.lmPortfolio && window.lmPortfolio(all, 0, { close: this.data.gallery.close, prev: this.data.gallery.prev, next: this.data.gallery.next }); } }, a.portfolio.cta),
-          h("a", { class: "btn btn-secondary", href: a.portfolio.page }, a.portfolio.h))) : null,
+      h("p", { class: "lead" }, pf.p),
+      h("ul", { class: "sp-works" }, pf.works.map((w, i) => h("li", {},
+        h("a", { href: pf.page + "#" + w.s, onclick: open(i) },
+          w.m.length ? h("img", { src: w.m[0], alt: "", loading: "lazy", width: "600", height: "400" }) : h("span", { class: "sp-work-cover" }, w.t),
+          h("span", { class: "sp-work-cat" }, w.c + (w.o ? " · " + pf.labels.openTag : "")),
+          h("span", { class: "sp-work-t" }, w.t),
+          h("span", { class: "sp-work-d" }, w.d))))),
+      h("div", { class: "sp-actions" }, h("a", { class: "btn btn-secondary", href: pf.page }, pf.all)),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, a.open_h),
+        h("p", {}, pf.open_p),
+        h("ul", { class: "sp-list" }, a.open.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
+      h("div", { class: "sp-section" },
+        h("h3", { class: "sp-h" }, pf.profile_h),
+        ...a.p.map((p) => h("p", {}, p))),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, a.skills_h),
         h("ul", { class: "sp-list" }, a.skills.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
-      h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, a.open_h),
-        h("ul", { class: "sp-list" }, a.open.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, a.explore_h),
         h("ul", { class: "sp-doors" }, a.explore.map((x) => h("li", {},
@@ -290,6 +293,7 @@ export class UI {
       a.cv ? h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: a.cv }, a.cv_label)) : null,
     ];
   }
+
 
   contactPanel() {
     const c = this.data.contact, f = c.form;

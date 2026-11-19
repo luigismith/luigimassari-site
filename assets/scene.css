@@ -127,6 +127,14 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 .sp-card :focus-visible { outline-color: var(--ambra); }
 .sp-card .status { color: var(--serigrafia); }
 .sp-card .note { font-size: 13px; margin: 12px 0 0; }
+.sp-works { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 22px 16px; max-width: 700px; }
+.sp-works a { display: block; color: inherit; text-decoration: none; }
+.sp-works img, .sp-work-cover { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 6px; }
+.sp-work-cover { display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 20px; background: linear-gradient(135deg, #1b2430, #2b3440); color: #e9ece6; }
+.sp-work-cat { display: block; font-size: 12px; margin-top: 8px; color: var(--ambra); }
+.sp-work-t { display: block; font-weight: 800; font-size: 17px; line-height: 1.2; }
+.sp-work-d { display: block; font-size: 14px; line-height: 1.4; opacity: .8; margin-top: 3px; }
+.sp-works a:hover .sp-work-t { text-decoration: underline; }
 .sp-figure { margin: 18px 0 6px; max-width: 580px; }
 .sp-gallery { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; max-width: 620px; }
 .sp-gallery a { display: block; border-radius: 6px; cursor: zoom-in; }

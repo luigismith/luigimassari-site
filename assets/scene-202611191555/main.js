@@ -323,7 +323,7 @@ export async function start({ data, root, force, toLofi }) {
   window.addEventListener("hashchange", () => goTo(hashView()));
   window.addEventListener("popstate", () => goTo(hashView()));
   document.addEventListener("keydown", (e) => {
-    if (document.querySelector("dialog.lightbox[open]")) return;   // Esc chiude prima la galleria di foto
+    if (document.querySelector("dialog[open]")) return;   // Esc chiude prima la galleria di foto o la scheda di un lavoro
     if (e.key === "Escape" && state.entered && !root.hidden) { e.preventDefault(); back(); }
   });
 
