@@ -610,3 +610,9 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
 .pf-home img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; transition: transform .3s; }
 .pf-home a:hover img { transform: scale(1.03); }
 @media (prefers-reduced-motion: reduce) { .pf-home img { transition: none; } }
+
+.area-img { display: block; width: 100%; height: auto; border-radius: 6px; margin-bottom: var(--s4); }
+
+.footer-local ul { list-style: none; padding: 0; margin: var(--s4) 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
+.footer-local a { color: var(--muted); }
+.footer-local a:hover { color: inherit; }

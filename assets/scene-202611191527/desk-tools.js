@@ -268,6 +268,13 @@ function laserPanel(ply) {
   const sheet = new THREE.Mesh(new THREE.ExtrudeGeometry(roundRect(0.168, 0.114, 0.002), { depth: T, bevelEnabled: false }), [ply.face, ply.edge]);
   const cut = new THREE.Mesh(new THREE.ExtrudeGeometry(panel, { depth: T, bevelEnabled: false, curveSegments: 20 }), [engraved, ply.edge]);
   g.add(lay(sheet, 0, 0.1), lay(cut, T + 0.0002, -0.07));
+  // sagoma invisibile per il contorno al passaggio del mouse: i fogli, piatti e sottili, a bassa risoluzione non lo mostrano
+  const halo = new THREE.Mesh(new THREE.BoxGeometry(0.172, 0.036, 0.12), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  halo.position.y = 0.018;
+  halo.rotation.y = 0.015;
+  halo.userData.noShadow = true;
+  halo.userData.dynamic = true;
+  g.add(halo);
   return g;
 }
 
