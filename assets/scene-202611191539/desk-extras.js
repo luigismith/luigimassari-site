@@ -95,11 +95,11 @@ function headphones(M) {
   led.position.set(0, 0.0056, 0.0616);
   g.add(saddle, led);
   // cavo che scende dal padiglione sinistro e si posa sul banco, con lo spinotto
-  const pts = [[-CX, LIFT + 0.006, 0.012], [-CX - 0.006, LIFT - 0.03, 0.03], [-CX + 0.014, 0.016, 0.066], [-0.03, 0.0026, 0.094], [0.02, 0.0026, 0.087], [0.06, 0.0026, 0.112]];
+  const pts = [[-CX, LIFT + 0.006, 0.012], [-CX - 0.006, LIFT - 0.03, 0.03], [-CX + 0.014, 0.016, 0.066], [-0.03, 0.0026, 0.078], [0.02, 0.0026, 0.07], [0.055, 0.0026, 0.05]];
   const cable = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => V(x, y, z))), 56, 0.0016, 6), shell);
   const plug = new THREE.Mesh(new THREE.CylinderGeometry(0.0026, 0.0026, 0.022, 10), M.steel);
   plug.rotation.set(Math.PI / 2, 0, -0.75);
-  plug.position.set(0.068, 0.0028, 0.119);
+  plug.position.set(0.064, 0.0028, 0.042);
   g.add(cable, plug);
   g.userData.setOn = (on) => {
     accent.emissiveIntensity = on ? 1.3 : 0;
@@ -628,20 +628,10 @@ export function createExtras(data) {
   const printerObj = printer(M);
   place(printerObj.group, -0.9, 0.08, 0.28, root);
   place(prints(), -0.63, 0.1, 0.4);
-  const hp = place(headphones(M), -0.8, 0.37, 0.5, root);   // a sinistra, accanto alla stampante: non copre i pezzi laser
+  const hp = place(headphones(M), -0.68, 0.29, 0.35, root);   // davanti alla stampante, tutta sul banco
+  hp.scale.setScalar(0.75);
   const hh = place(handheld(M, data.game.name), -0.125, 0.335, -0.2, root);   // si clicca: la scheda Videogames (Ctrl-Alt-Revenge e le console rimesse a nuovo)
   place(cabinet(M), 1.035, -0.27, -0.1);
-  const bb = place(breadboard(M), 0.19, 0.315, 0.12);
-  { // cavo USB della scheda: dalla breadboard gira dietro e sparisce sotto il rialzo degli strumenti
-    bb.updateMatrixWorld(true);
-    const a = bb.localToWorld(bb.userData.usb.clone()), y = DESK.y + 0.003;
-    const usb = new THREE.Group();
-    usb.name = "usbcable";
-    usb.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, V(a.x + 0.022, a.y - 0.004, a.z - 0.004), V(0.286, y, 0.272), V(0.247, y, 0.22), V(0.232, y, 0.1), V(0.24, y, -0.02), V(0.288, y, -0.088)]), 60, 0.0017, 6), M.dark));
-    shadow(usb);
-    props.add(usb);
-  }
-  place(multimeter(M), 0.66, 0.335, 0.25);
   place(toolCup(M), 0.255, -0.14);
   const notes = new THREE.Group();
   notes.name = "notes";

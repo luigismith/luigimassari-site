@@ -23,7 +23,7 @@ export const VIEWS = {
   dev: { pos: V(-0.06, 1.24, 1.5), target: V(-0.15, 1.07, -0.2), fov: 40 },
   print: { pos: V(-0.5, 1.28, 1.0), target: V(-0.9, 0.95, 0.08), fov: 40 },
   shop: { pos: V(0.64, 1.42, 1.0), target: V(0.64, 0.8, -0.08), fov: 40 },     // anche Stame, appoggiato al gradino
-  about: { pos: V(0.06, 1.2, 0.5), target: V(0.11, 0.77, 0.06), fov: 40 },
+  about: { pos: V(0.2, 1.2, 0.68), target: V(0.245, 0.77, 0.21), fov: 40 },
   contact: { pos: V(0.84, 1.1, 0.86), target: V(0.95, 0.79, 0.27), fov: 38 },
   laser: { pos: V(-0.38, 1.16, 0.6), target: V(-0.5, 0.77, -0.01), fov: 36 },
   game: { pos: V(-0.05, 1.08, 0.78), target: V(-0.125, 0.77, 0.335), fov: 34 },

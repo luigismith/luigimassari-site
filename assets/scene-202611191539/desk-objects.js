@@ -258,8 +258,22 @@ function createMonitor(M, data) {
   }
   keys.setMatrixAt(n++, new THREE.Matrix4().compose(V(0, 0.019, 0.055), new THREE.Quaternion(), V(5.5, 1, 1)));
   kb.add(keys);
-  kb.position.set(-0.06, 0, 0.29);
-  kb.rotation.y = 0;            // dritta, parallela al bordo del banco come il monitor
+  // tappetino da scrivania sotto tastiera e mouse, e il mouse a destra (fanno parte del gruppo della tastiera)
+  const deskMat = box(0.54, 0.003, 0.2, new THREE.MeshStandardMaterial({ color: 0x343a44, roughness: 0.95 }), 0.012, 2);
+  deskMat.position.set(0.05, -0.0015, 0.005);
+  const mouse = new THREE.Group();
+  const mbody = new THREE.Mesh(new THREE.SphereGeometry(0.03, 24, 14), M.plastic);
+  mbody.scale.set(0.62, 0.36, 1);
+  mbody.position.y = 0.004;
+  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.003, 12), M.black);
+  wheel.rotation.z = Math.PI / 2;
+  wheel.position.set(0, 0.0145, -0.012);
+  mouse.add(mbody, wheel);
+  mouse.position.set(0.26, 0, 0.01);
+  mouse.rotation.y = -0.12;
+  kb.add(deskMat, mouse);
+  kb.position.set(0, 0.003, 0.29);   // centrata sotto il monitor
+  kb.rotation.y = 0;                 // dritta, parallela al bordo del banco come il monitor
   g.add(kb);
   const glow = new THREE.PointLight(0x8fb2e8, 0.5, 1.4, 2);
   glow.position.set(0, 0.22, 0.25);
@@ -701,7 +715,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   sections.dev = monitor.group;
 
   const pad = createTablet(M, data);
-  place(pad.group, 0.11, 0.13, -0.1);
+  place(pad.group, 0.245, 0.26, -0.08);   // a destra del tappetino, davanti a Stame
   sections.about = pad.group;
   onProgress(0.3);
 
@@ -736,9 +750,6 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   updaters.push(recorder.update);
   sections.contact = recorder.group;
 
-  const station = createSolderingStation(M);
-  place(station.group, -0.37, 0.305, 0.35); // sul tappetino da taglio, dove non copre il tablet
-  updaters.push(station.update);
   const mug = createMug();
   place(mug.group, 0.14, -0.08, 2.4);
   updaters.push(mug.update);

@@ -377,12 +377,6 @@ function notebook(M) {
 export function addTools(place, M, laser) {
   const ply = plywood();
   const onMat = (o) => { o.position.y += MAT_TOP; return o; };
-  place(cuttingMat(), -0.345, 0.29, 0.04);
-  onMat(place(cutters(M), -0.455, 0.238, 2.25));
-  onMat(place(tweezers(M), -0.478, 0.302, 0.35));
-  onMat(place(screwdriver(M), -0.33, 0.374, 0.07));
-  onMat(place(looseBoard(), -0.262, 0.335, -0.18));
-  onMat(place(solderReel(M), -0.238, 0.238, 0.6));
   place(caliper(M), -1.0, 0.338, 0.03); // display leggibile da chi guarda, becchi grandi verso il bordo del banco
   place(laserPanel(ply), -0.5, 0.062, 0.06, laser);     // i pezzi tagliati al laser: si cliccano (scheda del taglio laser)
   place(fingerBox(ply), -0.49, -0.078, 0.34, laser);
