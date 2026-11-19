@@ -604,3 +604,9 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .pf-art img { transition: none; } }
 .pf-preview { list-style: none; padding: 0; margin: var(--s3) 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s2); }
 .pf-preview img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+
+.pf-home { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); align-content: start; }
+.pf-home a { display: block; border-radius: 6px; overflow: hidden; }
+.pf-home img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; transition: transform .3s; }
+.pf-home a:hover img { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) { .pf-home img { transition: none; } }

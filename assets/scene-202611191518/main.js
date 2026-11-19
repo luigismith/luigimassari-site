@@ -268,6 +268,7 @@ export async function start({ data, root, force, toLofi }) {
     addTag("lab", V(h.position.x, h.position.y - h.geometry.parameters.height / 2 - 0.1, h.position.z), 0);
   }
   addTag("contact", hitOf("contact")[0].userData.top, 22);
+  addTag("about", hitOf("about")[0].userData.top, 18);   // il tablet: Portfolio
   addTag("laser", hitOf("laser")[0].userData.top, 18);
   addTag("game", hitOf("game")[0].userData.top, 16);
   const tagPos = new THREE.Vector3();
@@ -410,7 +411,6 @@ export async function start({ data, root, force, toLofi }) {
     tmp.copy(top).project(camera);
     const x = (tmp.x + 1) / 2 * size.x, y = (1 - tmp.y) / 2 * size.y;
     if (slug && state.view === "shop") ui.showLabel(x, y, products[slug].name, products[slug].status_label);
-    else if (view === "about" && state.view === "overview") ui.showLabel(x, y, data.ui.labels.about); // il tablet non ha etichetta fissa
     else if (view === "sound") ui.showLabel(x, y, audio.enabled ? data.ui.sound_on : data.ui.sound_off, audio.enabled ? data.ui.sound_hint_off : data.ui.sound_hint_on);
     else ui.hideLabel(); // per le sezioni ci sono gia' le etichette fisse
   }
