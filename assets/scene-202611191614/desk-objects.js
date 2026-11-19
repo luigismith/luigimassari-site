@@ -240,41 +240,82 @@ function createMonitor(M, data) {
   const foot = box(0.3, 0.01, 0.17, frameMat, 0.004);
   foot.position.set(0, 0.005, -0.03);
   g.add(foot);
-  // tastiera
+  // Tastiera, mouse e tappetino (un gruppo a se': il riquadro cliccabile del monitor li esclude).
+  // Tastiera compatta al 75%: base di alluminio inclinata, 84 tasti scuri su sei file con le larghezze vere
+  // (tab, maiuscole, invio, barra), Esc e Invio ambra, un filo di retroilluminazione tra i tasti.
   const kb = new THREE.Group();
   kb.name = "keyboard";
-  kb.userData.dynamic = true;   // resta un gruppo a se': il riquadro cliccabile del monitor la esclude
-  const kbBase = box(0.4, 0.016, 0.135, M.plastic, 0.005, 2);
-  kbBase.position.y = 0.008;
-  kb.add(kbBase);
-  const keyGeo = new RoundedBoxGeometry(0.0225, 0.008, 0.0215, 2, 0.003);
-  // retroilluminazione appena accennata
-  const keys = new THREE.InstancedMesh(keyGeo, new THREE.MeshStandardMaterial({ color: 0x2f353c, roughness: 0.6, emissive: 0x6a4a12, emissiveIntensity: 0.08 }), 4 * 14 + 1);
-  const m4 = new THREE.Matrix4();
-  let n = 0;
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 14; c++) {
-    m4.makeTranslation(-0.183 + c * 0.0262 + (r % 2) * 0.006, 0.019, -0.045 + r * 0.025);
-    keys.setMatrixAt(n++, m4);
-  }
-  keys.setMatrixAt(n++, new THREE.Matrix4().compose(V(0, 0.019, 0.055), new THREE.Quaternion(), V(5.5, 1, 1)));
-  kb.add(keys);
-  // tappetino da scrivania sotto tastiera e mouse, e il mouse a destra (fanno parte del gruppo della tastiera)
-  const deskMat = box(0.54, 0.003, 0.2, new THREE.MeshStandardMaterial({ color: 0x343a44, roughness: 0.95 }), 0.012, 2);
-  deskMat.position.set(0.05, -0.0015, 0.005);
+  kb.userData.dynamic = true;
+  const deskMat = box(0.56, 0.003, 0.25, new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 1 }), 0.014, 2);
+  deskMat.position.set(0.035, 0.0015, 0.0);
+  kb.add(deskMat);
+  const U = 0.0192, KW = 16 * U, ROWS = [
+    Array(16).fill(1),
+    [...Array(13).fill(1), 2, 1],
+    [1.5, ...Array(12).fill(1), 1.5, 1],
+    [1.75, ...Array(11).fill(1), 2.25, 1],
+    [2.25, ...Array(10).fill(1), 1.75, 1, 1],
+    [1.25, 1.25, 1.25, 6.25, 1, 1, 1, 1, 1, 1],
+  ];
+  const board = new THREE.Group();
+  const baseM = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.36, metalness: 0.85 });
+  const kbBase = box(KW + 0.014, 0.011, 6 * U + 0.014, baseM, 0.004, 3);
+  kbBase.position.y = 0.0055;
+  const glowPlate = new THREE.Mesh(new THREE.PlaneGeometry(KW + 0.002, 6 * U + 0.002), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 0.3, 0.06) }));
+  glowPlate.rotation.x = -Math.PI / 2;
+  glowPlate.position.y = 0.0112;
+  board.add(kbBase, glowPlate);
+  const capGeo = new RoundedBoxGeometry(U - 0.0022, 0.0072, U - 0.0022, 3, 0.0022);
+  const capM = new THREE.MeshStandardMaterial({ color: 0x24282e, roughness: 0.62 });
+  const accentM = new THREE.MeshStandardMaterial({ color: 0xf2a33a, roughness: 0.5 });
+  const total = ROWS.reduce((n, r) => n + r.length, 0);
+  const keys = new THREE.InstancedMesh(capGeo, capM, total - 2), accents = new THREE.InstancedMesh(capGeo, accentM, 2);
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion();
+  let n = 0, na = 0;
+  ROWS.forEach((row, r) => {
+    let x = -KW / 2;
+    row.forEach((w, c) => {
+      const sx = (w * U - 0.0022) / (U - 0.0022);
+      m4.compose(V(x + (w * U) / 2, 0.0148, (r - 2.5) * U), q0, V(sx, 1, 1));
+      if ((r === 0 && c === 0) || (r === 3 && c === row.length - 2)) accents.setMatrixAt(na++, m4); else keys.setMatrixAt(n++, m4);
+      x += w * U;
+    });
+  });
+  board.add(keys, accents);
+  board.rotation.x = 0.055;                     // piedini dietro: il piano dei tasti sale verso il monitor
+  board.position.set(0, 0.003 + 0.0035, -0.01);
+  kb.add(board);
+  // Mouse: guscio a pianta arrotondata (non un uovo), piu' alto verso il polso, con i solchi dei due tasti e la
+  // rotella incassata. shape() porta un punto della mezza sfera unitaria sulla superficie del mouse.
   const mouse = new THREE.Group();
-  const mbody = new THREE.Mesh(new THREE.SphereGeometry(0.058, 28, 16), M.plastic);   // un mouse vero: circa 11,5 x 7 x 3,8 cm
-  mbody.scale.set(0.6, 0.34, 1);
-  mbody.position.y = 0.0;
-  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.003, 12), M.black);
+  const shape = (x, y, z) => {
+    const a = Math.atan2(z, x), r = Math.hypot(x, z), n = 3.4;
+    const f = 1 / Math.pow(Math.pow(Math.abs(Math.cos(a)), n) + Math.pow(Math.abs(Math.sin(a)), n), 1 / n);
+    const t = (z + 1) / 2;                                   // 0 davanti, 1 verso il polso
+    return V(r * Math.cos(a) * f * 0.0295, Math.pow(y, 0.85) * 0.036 * (0.62 + 0.38 * Math.sin(t * Math.PI * 0.64)), r * Math.sin(a) * f * 0.052);
+  };
+  const mg = new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), mp = mg.attributes.position;
+  for (let i = 0; i < mp.count; i++) { const v = shape(mp.getX(i), Math.max(0, mp.getY(i)), mp.getZ(i)); mp.setXYZ(i, v.x, v.y, v.z); }
+  mg.computeVertexNormals();
+  const shell = new THREE.Mesh(mg, new THREE.MeshStandardMaterial({ color: 0x30353c, roughness: 0.42, metalness: 0.15 }));
+  shell.position.y = 0.0005;
+  const on = (x, z, lift = 0.0004) => { const v = shape(x, Math.sqrt(Math.max(0, 1 - x * x - z * z)), z); v.y += 0.0005 + lift; return v; };
+  const groove = (pts) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.00065, 6), M.black);
+  const mid = [], across = [];
+  for (let k = 0; k <= 14; k++) mid.push(on(0, -0.97 + k * 0.066));                 // tra i due tasti, dal bordo davanti a meta'
+  for (let k = 0; k <= 16; k++) across.push(on(-0.93 + k * 0.11625, -0.05));         // dove finiscono i tasti
+  const wc = on(0, -0.5, -0.0016);
+  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.0052, 0.0052, 0.0046, 20), new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.8 }));
   wheel.rotation.z = Math.PI / 2;
-  wheel.scale.setScalar(1.6);
-  wheel.position.set(0, 0.0188, -0.024);
-  mouse.add(mbody, wheel);
-  mouse.position.set(0.265, 0, 0.012);
-  mouse.rotation.y = -0.12;
-  kb.add(deskMat, mouse);
-  kb.position.set(0, 0.003, 0.29);   // centrata sotto il monitor
-  kb.rotation.y = 0;                 // dritta, parallela al bordo del banco come il monitor
+  wheel.position.copy(wc);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.0054, 0.0054, 0.0012, 20), new THREE.MeshStandardMaterial({ color: 0xf2a33a, roughness: 0.45, emissive: 0x7a3e00, emissiveIntensity: 0.7 }));
+  ring.rotation.z = Math.PI / 2;
+  ring.position.copy(wc);
+  mouse.add(shell, groove(mid), groove(across), wheel, ring);
+  mouse.position.set(0.238, 0.003, 0.012);
+  mouse.rotation.y = -0.1;
+  kb.add(mouse);
+  kb.position.set(0, 0, 0.3);        // centrata sotto il monitor, parallela al bordo del banco
   g.add(kb);
   const glow = new THREE.PointLight(0x8fb2e8, 0.5, 1.4, 2);
   glow.position.set(0, 0.22, 0.25);
@@ -716,7 +757,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   sections.dev = monitor.group;
 
   const pad = createTablet(M, data);
-  place(pad.group, 0.245, 0.26, -0.08);   // a destra del tappetino, davanti a Stame
+  place(pad.group, 0.27, 0.275, -0.08);   // a destra del tappetino, davanti a Stame
   sections.about = pad.group;
   onProgress(0.3);
 

@@ -268,7 +268,8 @@ vec3 water(float az, float el, float blur, float t) {
       float dx = (uu - lampU(i)) * HWB / w;
       col += SODIUM * exp(-dx * dx) * brk * exp(-dep / 0.03) * 0.26;
     }
-    if (abs(uu) < 1.0) col *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, DECK, dep));   // sotto il ponte l'acqua e' piu' scura
+    // il ponte capovolto scurisce l'acqua con la sua sagoma (arcata e impalcato), non con una fascia rettangolare
+    col *= 1.0 - 0.4 * bridgeMask(uu, dep * 1.1, 0.0014 + dep * 0.06) * exp(-dep / 0.09) * (0.55 + 0.45 * brk);
     if (inCastle(uu)) col += vec3(0.085, 0.050, 0.020) * exp(-dep / 0.022) * (0.3 + 0.7 * brk);
     for (int i = 0; i < CARS; i++) {                             // i fari delle auto che passano sul ponte
       vec3 c = carAt(i, t);
@@ -398,8 +399,16 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
     col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
     col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud));   // con il sereno l'acqua prende l'azzurro del cielo
-    float u = townU(az) + rip * 0.25;                            // riflesso scuro del ponte e chiaro del castello
-    if (abs(u) < 1.0) col *= 1.0 - 0.28 * smoothstep(bridgeUnder(u) - 0.004, bridgeUnder(u), dep) * (1.0 - smoothstep(DECK, DECK + 0.006, dep));
+    // Il ponte capovolto nell'acqua: la stessa sagoma (arcata, impalcato, spalle) specchiata sotto la linea di riva,
+    // mossa dalle onde e sempre piu' sbiadita e rotta allontanandosi. Prima era una fascia scura dai bordi netti.
+    float u = townU(az) + rip * (0.03 + dep * 3.0);
+    if (abs(u) < 1.2) {
+      float ry = dep * 1.1;
+      float brk = 0.5 + 0.5 * smoothstep(0.3, 0.7, fbm3(vec2(wp.x * 2.3, wp.y * 1.4 - t * 0.5)));
+      float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
+      vec3 steel = mix(mix(vec3(0.12, 0.16, 0.20), vec3(0.26, 0.33, 0.38), smoothstep(yb, DECK, ry)), daySky(az, HOR + 0.02, t), 0.3);
+      col = mix(col, steel * 0.78, bridgeMask(u, ry, 0.0014 + dep * 0.06) * brk * 0.85 * exp(-dep / 0.09));
+    }
     if (inCastle(u)) col = mix(col, vec3(0.50, 0.47, 0.42), 0.22 * exp(-dep / 0.03));
     // la barca: scafo chiaro, cabina e una scia corta
     float ba = boatAz(t);
