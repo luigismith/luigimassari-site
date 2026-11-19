@@ -1,5 +1,5 @@
 // Eremo com'e' davvero: il sintetizzatore generativo nella scatola nera stampata in 3D (150 x 110 x 30 mm) con il
-// pannello di compensato inciso al laser. Le scritte sono in gotico: shift/mode e drone/rhythm sopra i due tasti
+// pannello di compensato inciso al laser. Le scritte sono in gotico: shift/mode e drums/rhythm sopra i due tasti
 // quadrati, Spheres, Light, Breath e Sparks sopra le quattro manopole. Al centro il display rotondo con l'onda
 // fatta di punti, che qui si muove davvero. Le prese (uscita audio, microfono, USB-C) stanno sul fianco sinistro.
 import * as THREE from "three";
@@ -29,7 +29,7 @@ function panelCanvas() {
     x.fillStyle = "rgba(30, 16, 6, 0.92)"; x.fillText(t, mx * P, my * P);
   };
   word("shift", 25, 18, 8); word("mode", 25, 58, 8);
-  word("drone", 125, 18, 8); word("rhythm", 125, 58, 8);
+  word("drums", 125, 18, 8); word("rhythm", 125, 58, 8);
   [["Spheres", 24], ["Light", 58], ["Breath", 92], ["Sparks", 126]].forEach(([t, mx]) => word(t, mx, 76, 8.5));
   // alone scuro attorno al foro del display e alle cornici dei tasti
   x.fillStyle = "rgba(25, 14, 5, 0.55)";
