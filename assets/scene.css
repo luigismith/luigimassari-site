@@ -128,6 +128,10 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 .sp-card .status { color: var(--serigrafia); }
 .sp-card .note { font-size: 13px; margin: 12px 0 0; }
 .sp-figure { margin: 18px 0 6px; max-width: 580px; }
+.sp-gallery { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; max-width: 620px; }
+.sp-gallery a { display: block; border-radius: 6px; cursor: zoom-in; }
+.sp-gallery img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 6px; }
+.sp-gallery p { font-size: 13px; line-height: 1.35; margin-top: 6px; opacity: .82; }
 .sp-figure img { display: block; width: 100%; height: auto; border-radius: 6px; }
 .sp-figure figcaption { font-size: 13px; line-height: 1.45; margin-top: 8px; opacity: .8; }
 .sp-section > p + p { margin-top: 10px; }

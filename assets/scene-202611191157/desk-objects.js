@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createIchosynth } from "./ichosynth.js";
 import { createStame } from "./stame.js";
+import { createEremo } from "./eremo.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   woodTextures, noiseRoughness, CodeScreen, tabletTexture, panelTextures, panelEmissive,
@@ -711,14 +712,15 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   const ledMats = [0, 1, 2].map(() => new THREE.MeshStandardMaterial({ color: 0x5a1410, emissive: 0xff2a1a, emissiveIntensity: 3, roughness: 0.3 }));
   const spots = {
     ichosynth: [0.47, -0.24, 0.05, DESK.y + 0.07],
-    "open-orc": [0.81, -0.24, -0.1, DESK.y + 0.07],
+    eremo: [0.745, -0.25, -0.18, DESK.y + 0.07],
     stame: [0.62, 0.035, 0],               // sul banco, appoggiato al gradino degli altri due strumenti
   };
   const synths = [];
   let i = 0;
   for (const p of data.shop.products) {
-    // Ichosynth e Stame hanno il loro modello, fatto sulle misure vere; gli altri nascono dal frontale SVG
-    const s = p.slug === "ichosynth" ? createIchosynth(M, p) : p.slug === "stame" ? createStame(M, p) : await createSynth(M, p, ledMats);
+    // Ichosynth, Eremo e Stame hanno il loro modello, fatto sulle misure vere; un prodotto nuovo nasce dal frontale SVG
+    const MODELS = { ichosynth: createIchosynth, eremo: createEremo, stame: createStame };
+    const s = MODELS[p.slug] ? MODELS[p.slug](M, p) : await createSynth(M, p, ledMats);
     if (s.update) updaters.push(s.update);
     const [x, z, ry, y] = spots[p.slug] || [0.3 + i * 0.2, 0.0, 0];
     place(s.group, x, z, ry, y ?? DESK.y);
@@ -749,10 +751,8 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
     return s && s.jacks[i] ? s.inner.localToWorld(s.jacks[i].clone()).add(V(0, 0.004, 0)) : null;
   };
   const up = (p, h) => p.clone().add(V(0, h, 0));
-  const a1 = jackW("ichosynth", 0), b1 = jackW("open-orc", 0);
+  const a1 = jackW("ichosynth", 0), b1 = jackW("eremo", 0);
   if (a1 && b1) root.add(patchCable(M, 0xc8261b, [a1, V(a1.x, a1.y + 0.004, a1.z - 0.03), V(a1.x + 0.07, a1.y + 0.03, a1.z - 0.04), up(a1.clone().lerp(b1, 0.6), 0.08), up(b1, 0.035), b1]));
-  const a3 = jackW("open-orc", 1);
-  if (a3) root.add(patchCable(M, 0xe9ece6, [a3, up(a3, 0.03), V(a3.x + 0.05, Y + 0.09, -0.36), V(a3.x + 0.12, Y + 0.004, -0.3), V(a3.x + 0.16, Y + 0.004, -0.2), V(a3.x + 0.12, Y + 0.004, -0.15)]));
   onProgress(1);
 
   // --- ologramma dello spettro e striscia LED sul fondo del banco ---

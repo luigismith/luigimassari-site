@@ -223,6 +223,7 @@ export class UI {
         h("h3", { class: "sp-h" }, s.pick),
         h("ul", { class: "sp-products" }, this.productButtons.map((b) => h("li", {}, b)))),
       this.card,
+      this.galleryBlock("synth", this.data.gallery.hsynth),
       h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: s.page }, s.page_label)),
     ];
     if (this.selected) queueMicrotask(() => this.showProduct(this.selected, false));
@@ -335,13 +336,25 @@ export class UI {
     ];
   }
   labPanel() { const l = this.data.lab; return this.itemsPanel(l, { href: l.more_href, label: l.more }); }
-  printPanel() { return this.itemsPanel(this.data.print); }
+  // foto dei lavori: miniature con didascalia; un clic apre la foto intera in una nuova scheda
+  galleryBlock(key, title) {
+    const g = this.data.gallery;
+    if (!g || !g[key] || !g[key].length) return null;
+    return h("div", { class: "sp-section" },
+      h("h3", { class: "sp-h" }, title),
+      h("ul", { class: "sp-gallery" }, g[key].map((x) => h("li", {},
+        h("a", { href: x.src, ...EXT }, h("img", { src: x.thumb, alt: x.alt, loading: "lazy", width: "600", height: "400" }), h("span", { class: "visually-hidden" }, " (" + this.data.ui.new_tab + ")")),
+        h("p", { "aria-hidden": "true" }, x.alt)))),
+      h("p", { class: "note" }, g.note));
+  }
+  printPanel() { return [...this.itemsPanel(this.data.print), this.galleryBlock("3d", this.data.gallery.h3d)]; }
 
   // il taglio laser: i pezzi sul banco (pannello e scatola a incastri), con un esempio vero
   laserPanel() {
     const l = this.data.laser;
     return [
       ...this.itemsPanel(l),
+      this.galleryBlock("laser", this.data.gallery.hlaser),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, l.example_h),
         h("p", {}, l.example),

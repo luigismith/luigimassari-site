@@ -560,3 +560,15 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
 @media (min-width: 861px) { .instruments { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 980px) { .offers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .offers { grid-template-columns: 1fr; } }
+
+/* gallerie dei lavori, con la foto grande in un dialogo */
+.gallery-block { margin-top: var(--s7); }
+.gallery-grid { list-style: none; padding: 0; margin: var(--s4) 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s4); }
+.gallery-grid a { display: block; border-radius: 6px; cursor: zoom-in; }
+.gallery-grid img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 6px; }
+.gallery-grid p { font-size: 14px; line-height: 1.4; color: var(--muted); margin-top: var(--s2); }
+.lightbox { border: 0; padding: 0; background: transparent; max-width: min(1400px, 94vw); max-height: 92vh; }
+.lightbox::backdrop { background: rgba(6, 8, 12, .86); }
+.lightbox img { display: block; max-width: 100%; max-height: 82vh; width: auto; height: auto; border-radius: 6px; margin: 0 auto; }
+.lightbox p { color: #e9ece6; text-align: center; margin-top: 10px; font-size: 15px; }
+.lightbox button { position: absolute; top: 8px; right: 8px; background: rgba(6, 8, 12, .7); color: #fff; border: 1px solid rgba(255, 255, 255, .4); border-radius: 4px; padding: 6px 12px; cursor: pointer; font: inherit; }

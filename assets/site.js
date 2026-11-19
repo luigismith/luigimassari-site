@@ -200,4 +200,28 @@
       });
     });
   })();
+
+  // Gallerie dei lavori: la miniatura apre la foto grande in un dialogo (Esc o il pulsante lo chiudono)
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll("a[data-lightbox]"));
+    if (!links.length || typeof HTMLDialogElement === "undefined") return;
+    var lang = document.documentElement.lang === "en" ? "en" : "it";
+    var d = document.createElement("dialog");
+    d.className = "lightbox";
+    d.innerHTML = '<button type="button">' + (lang === "en" ? "Close" : "Chiudi") + '</button><img alt=""><p></p>';
+    document.body.appendChild(d);
+    var img = d.querySelector("img"), cap = d.querySelector("p");
+    d.querySelector("button").addEventListener("click", function () { d.close(); });
+    d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+    links.forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+        e.preventDefault();
+        img.src = a.getAttribute("href");
+        img.alt = a.dataset.caption || "";
+        cap.textContent = a.dataset.caption || "";
+        d.showModal();
+      });
+    });
+  })();
 })();

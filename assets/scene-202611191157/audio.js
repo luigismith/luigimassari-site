@@ -198,7 +198,7 @@ export class SceneAudio {
     if (!this.enabled || !this.init()) return;
     if (this.ctx.state === "suspended") this.ctx.resume();
     const t = this.ctx.currentTime + 0.05;
-    ({ ichosynth: () => this.stepPattern(t), "open-orc": () => this.chord(t), stame: () => this.drone(t) }[slug] || (() => {}))();
+    ({ ichosynth: () => this.stepPattern(t), eremo: () => this.drone(t), stame: () => this.chord(t) }[slug] || (() => {}))();
   }
 
   env(g, t, a, peak, d) {
@@ -238,7 +238,7 @@ export class SceneAudio {
     }
   }
 
-  // Open-Orc: un accordo pieno con il basso
+  // Stame: un accordo pieno con il basso
   chord(t0) {
     const ctx = this.ctx;
     const voices = [[48, "triangle", 0.22], [60, "sawtooth", 0.07], [64, "sawtooth", 0.07], [67, "sawtooth", 0.07], [71, "sawtooth", 0.06], [74, "sawtooth", 0.05]];
@@ -259,7 +259,7 @@ export class SceneAudio {
     });
   }
 
-  // Stame: un bordone che si apre piano
+  // Eremo: un bordone che si apre piano
   drone(t0) {
     const ctx = this.ctx, dur = 4.2;
     const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.Q.value = 6;
