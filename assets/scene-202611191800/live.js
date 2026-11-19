@@ -13,6 +13,15 @@ const HOUR = 60 * 60 * 1000, HALF_HOUR = HOUR / 2;
 const RAD = Math.PI / 180;
 const norm = (deg) => ((deg % 360) + 360) % 360;
 
+// Vento: dai metri al secondo a un valore 0..1 per il mare. 0 fino a circa 1 m/s (specchio d'acqua),
+// 1 da 12 m/s in su (mare mosso, creste); la curva sale presto e si ammorbidisce ai due capi.
+// 0.5 e' il mare di sempre (a circa 5 m/s): e' anche il valore dei temi fissi e quello usato senza dati.
+export const WIND_DEFAULT = 0.5;
+export function windLevel(ms) {
+  const x = Math.min(1, Math.max(0, (ms - 1) / 11)), y = Math.pow(x, 0.7);
+  return y * y * (3 - 2 * y);
+}
+
 // Altezza del sole sull'orizzonte in gradi (formule a bassa precisione dell'Astronomical Almanac:
 // l'errore resta ben sotto il mezzo grado, più che sufficiente per decidere quanta luce c'è).
 export function sunAltitude(date, lat, lon) {
@@ -35,7 +44,8 @@ export function daylight(alt) {
 }
 
 // Dalla risposta di MET Norway alle cose che servono alla scena:
-// rain 0 asciutto, 0.5 pioggia debole, 1 pioggia forte; cloud 0 sereno, 1 coperto; kind = chiave del testo; temp in gradi.
+// rain 0 asciutto, 0.5 pioggia debole, 1 pioggia forte; cloud 0 sereno, 1 coperto; kind = chiave del testo; temp in gradi;
+// wind 0..1 (vedi windLevel) e windMs in m/s, con un quarto della raffica sopra il vento medio; senza il dato restano null.
 export function readWeather(json, date = new Date()) {
   const series = json && json.properties && json.properties.timeseries;
   if (!Array.isArray(series) || !series.length) return null;
@@ -67,6 +77,12 @@ export function readWeather(json, date = new Date()) {
   if (kind === "fog") cloud = 1;
   if (rain >= 0.8) cloud = Math.max(cloud, 0.7);
   const temp = typeof now.air_temperature === "number" ? Math.round(now.air_temperature) : null;
+  let wind = null, windMs = null;
+  if (typeof now.wind_speed === "number" && now.wind_speed >= 0) {
+    const gust = typeof now.wind_speed_of_gust === "number" ? Math.max(now.wind_speed_of_gust, now.wind_speed) : now.wind_speed;
+    wind = windLevel(now.wind_speed + 0.25 * (gust - now.wind_speed));
+    windMs = Math.round(now.wind_speed * 10) / 10;
+  }
   // le prossime ore, una per una: temperatura e pioggia, per la curva proiettata sul vetro.
   // Ci si ferma al primo buco: piu' avanti la serie passa a passi di sei ore.
   const hours = [];
@@ -80,14 +96,15 @@ export function readWeather(json, date = new Date()) {
     prev = t;
     if (hours.length === 13) break;
   }
-  return { rain, cloud: Math.min(1, Math.max(0, cloud)), kind, temp, hours };
+  return { rain, cloud: Math.min(1, Math.max(0, cloud)), kind, temp, wind, windMs, hours };
 }
 
 const forecasts = new Map(); // ultima risposta per ogni posto, con la sua scadenza: in memoria, mai su disco
 
 export class LiveMode {
   // onChange riceve lo stato a ogni aggiornamento:
-  // { day, alt, warm, rain, cloud, kind, temp, hours: [{ time, temp, mm }], weather: "wait" | "ok" | "none", where: "you" | "taranto", date }
+  // { day, alt, warm, rain, cloud, kind, temp, wind, windMs, hours: [{ time, temp, mm }], weather: "wait" | "ok" | "none", where: "you" | "taranto", date }
+  // (wind 0..1 per il mare, WIND_DEFAULT se manca il dato; windMs in m/s o null)
   constructor({ onChange, clock = () => new Date() }) {
     this.onChange = onChange;
     this.clock = clock;
@@ -197,7 +214,8 @@ export class LiveMode {
     const w = this.weather === "ok" ? readWeather(this.forecast, date) : null;
     this.state = {
       day, alt, warm: 4 * day * (1 - day),
-      rain: w ? w.rain : 0, cloud: w ? w.cloud : 0.35, kind: w ? w.kind : null, temp: w ? w.temp : null, hours: w ? w.hours : null,
+      rain: w ? w.rain : 0, cloud: w ? w.cloud : 0.35, kind: w ? w.kind : null, temp: w ? w.temp : null,
+      wind: w && w.wind !== null ? w.wind : WIND_DEFAULT, windMs: w ? w.windMs : null, hours: w ? w.hours : null,
       weather: w ? "ok" : this.weather === "ok" ? "none" : this.weather,
       where: this.where, date,
     };

@@ -471,7 +471,7 @@ export async function start({ data, root, force, toLofi }) {
     timer.update(time);
     const dt = Math.min(timer.getDelta(), 0.1);
     t += dt;
-    room.update(t);
+    room.update(t, dt);
     objects.update(t, dt, frameCtx);
     extras.update(t);
     rig.update(dt);

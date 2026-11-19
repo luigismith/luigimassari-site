@@ -140,6 +140,8 @@ uniform sampler2D uStars; // cielo vero ("dal vivo"): le stelle disegnate da set
 uniform float uStarAmt;   // 0 nei temi scuro e chiaro
 uniform vec4 uMoon;       // Luna: azimut, altezza, frazione illuminata, presenza (0 o 1)
 uniform vec2 uMoonDir;    // verso del lembo illuminato
+uniform float uWind;      // vento: 0 calma piatta, 0.5 il mare di sempre (temi scuro e chiaro), 1 mare mosso
+uniform float uWaveT;     // tempo delle onde: come uTime, ma scorre piu' piano con la calma e piu' in fretta con il vento
 const float SKY_AZ = 0.7;
 const float SKY_EL = 0.7;
 const float MOON_R = 0.0075;
@@ -163,6 +165,12 @@ float fbm3(vec2 p) {
   float a = .5, s = 0.;
   for (int i = 0; i < 3; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= .5; }
   return s;
+}
+
+// Vento (uWind): con 0.5 ogni mix qui sotto vale esattamente il suo valore di mezzo, cioe' il mare di sempre.
+// wm(calma, mezzo, mosso): il valore da usare con vento 0, 0.5 e 1; in mezzo si sfuma.
+float wm(float calm, float mid, float storm) {
+  return mix(mix(mid, calm, clamp(1.0 - uWind * 2.0, 0.0, 1.0)), storm, clamp(uWind * 2.0 - 1.0, 0.0, 1.0));
 }
 
 // Fuori: tutto e' funzione della direzione (azimut az, elevazione el in radianti),
@@ -339,7 +347,15 @@ vec3 redLights(float az, float el, float blur, float t) {
 vec3 water(float az, float el, float blur, float t) {
   float dep = max(HOR - el, 0.0004);               // depressione sotto l'orizzonte
   vec2 wp = vec2(az / dep, 1.0 / dep);             // coordinate sul piano dell'acqua
-  float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
+  // il vento cambia le onde: con la calma poche increspature, larghe e lente; con il vento fitte, alte e svelte
+  float tw = uWaveT, rf = wm(0.55, 1.0, 1.7), rh = wm(0.3, 1.0, 1.7);
+  float big = fbm3(vec2(wp.x * 0.9 * rf, wp.y * 0.55 * rf - tw * 0.35));
+  float rip = (big - 0.5) * rh;
+  float wobA = wm(0.6, 1.0, 2.6), wobF = wm(0.6, 1.0, 2.2);    // quanto e quanto in fretta il riflesso trema di lato
+  float wid = wm(0.85, 1.0, 1.9);                              // larghezza dei riflessi
+  float gap = wm(0.8, 1.0, 0.8);                               // i riflessi larghi si spalmano e perdono luce
+  float bLo = wm(0.0, 0.38, 0.52), bHi = wm(0.55, 0.75, 0.82), bF = wm(0.6, 1.0, 2.4);   // soglie e frequenza delle rotture
+  float lenK = wm(1.5, 1.0, 0.6);                              // lunghezza dei riflessi: lunghi con la calma, corti con il vento
   float fres = 0.04 + 0.96 * pow(1.0 - smoothstep(0.0, 0.35, dep), 5.0);
   vec3 col = vec3(0.004, 0.007, 0.012);
   col += sky(az + rip * dep * 0.6, HOR + dep * 0.9 + rip * 0.01, t) * (0.35 + 0.5 * fres);
@@ -353,43 +369,43 @@ vec3 water(float az, float el, float blur, float t) {
       if (h11(sd) > (row == 0 ? 0.42 : 0.2)) continue;
       float a = (id + 0.5 + (h11(sd + 3.1) - 0.5) * 0.7) * cell;
       if (abs(townU(a)) < 1.03) continue;
-      float wob = (vnoise(vec2(wp.y * 0.35 + id, t * 1.3)) - 0.5) * dep * 0.07;
-      float w = 0.0006 + dep * 0.007 + blur * 0.0009;
+      float wob = (vnoise(vec2(wp.y * 0.35 * wobF + id, tw * 1.3)) - 0.5) * dep * 0.07 * wobA;
+      float w = (0.0006 + dep * 0.007 + blur * 0.0009) * wid;
       float dx = (az - a + wob) / w;
       float streak = exp(-dx * dx);
-      float broken = smoothstep(0.38, 0.75, vnoise(vec2(id * 3.1 + float(row), wp.y * 0.45 - t * 1.8)));
-      float len = exp(-dep / (0.028 + float(row) * 0.01));
+      float broken = smoothstep(bLo, bHi, vnoise(vec2(id * 3.1 + float(row), wp.y * 0.45 * bF - tw * 1.8)));
+      float len = exp(-dep / ((0.028 + float(row) * 0.01) * lenK));
       float boost;
       vec3 c = lightCol(sd, boost);
-      col += c * streak * broken * len * (row == 0 ? 0.75 : 0.35) * boost;
+      col += c * streak * broken * len * (row == 0 ? 0.75 : 0.35) * boost * gap;
     }
   }
   // riflessi del ponte girevole e del castello
   float u = townU(az);
   if (abs(u) < 2.3) {
-    float wobb = (vnoise(vec2(wp.y * 0.35 + 5.0, t * 1.3)) - 0.5) * dep * 0.07;
+    float wobb = (vnoise(vec2(wp.y * 0.35 * wobF + 5.0, tw * 1.3)) - 0.5) * dep * 0.07 * wobA;
     float uu = u + wobb / HWB;
-    float brk = smoothstep(0.3, 0.75, vnoise(vec2(u * 26.0, wp.y * 0.45 - t * 1.8)));
-    float w = 0.0006 + dep * 0.007 + blur * 0.0009;
+    float brk = smoothstep(wm(0.0, 0.3, 0.5), bHi, vnoise(vec2(u * 26.0, wp.y * 0.45 * bF - tw * 1.8)));
+    float w = (0.0006 + dep * 0.007 + blur * 0.0009) * wid;
     for (int i = 0; i < LAMPS; i++) {
       float dx = (uu - lampU(i)) * HWB / w;
-      col += SODIUM * exp(-dx * dx) * brk * exp(-dep / 0.03) * 0.26;
+      col += SODIUM * exp(-dx * dx) * brk * exp(-dep / (0.03 * lenK)) * 0.26 * gap;
     }
     // il ponte capovolto scurisce l'acqua con la sua sagoma (arcata e impalcato), non con una fascia rettangolare
     col *= 1.0 - 0.4 * bridgeMask(uu, dep * 1.1, 0.0014 + dep * 0.06) * exp(-dep / 0.09) * (0.55 + 0.45 * brk);
-    if (inCastle(uu)) col += vec3(0.085, 0.050, 0.020) * exp(-dep / 0.022) * (0.3 + 0.7 * brk);
+    if (inCastle(uu)) col += vec3(0.085, 0.050, 0.020) * exp(-dep / (0.022 * lenK)) * (0.3 + 0.7 * brk);
     for (int i = 0; i < CARS; i++) {                             // i fari delle auto che passano sul ponte
       vec3 c = carAt(i, t);
-      if (abs(c.x) < 1.1) { float dx = (uu - c.x) * HWB / w; col += vec3(1.0, 0.93, 0.78) * exp(-dx * dx) * brk * exp(-dep / 0.025) * 0.16 * c.y; }
+      if (abs(c.x) < 1.1) { float dx = (uu - c.x) * HWB / w; col += vec3(1.0, 0.93, 0.78) * exp(-dx * dx) * brk * exp(-dep / (0.025 * lenK)) * 0.16 * c.y * gap; }
     }
   }
   if (uMoon.w > 0.0) {                                           // la scia della Luna sull'acqua
-    float mx = (az - uMoon.x) / (0.012 + dep * 0.45);
-    float glit = smoothstep(0.35, 0.8, vnoise(vec2(wp.x * 2.0, wp.y * 0.6 - t * 1.2)));
-    col += vec3(0.55, 0.58, 0.62) * exp(-mx * mx) * glit * uMoon.z * (1.0 - smoothstep(0.15, 0.75, uCloud)) * 0.35 * exp(-dep / 0.25);
+    float mx = (az - uMoon.x) / ((0.012 + dep * 0.45) * wm(0.6, 1.0, 1.6));        // calma: scia stretta; vento: larga
+    float glit = smoothstep(wm(0.0, 0.35, 0.55), wm(0.4, 0.8, 0.9), vnoise(vec2(wp.x * 2.0 * wm(0.7, 1.0, 2.2), wp.y * 0.6 * wm(0.7, 1.0, 1.9) - tw * 1.2)));
+    col += vec3(0.55, 0.58, 0.62) * exp(-mx * mx) * glit * uMoon.z * (1.0 - smoothstep(0.15, 0.75, uCloud)) * 0.35 * wm(1.4, 1.0, 0.9) * exp(-dep / (0.25 * wm(1.4, 1.0, 0.8)));
   }
   // riflesso rosso tremolante
-  col += redLights(az + (vnoise(vec2(wp.y * 0.3, t)) - 0.5) * dep * 0.1, HOR + dep * 0.25 + 0.01, blur + 1.5, t) * 0.25 * exp(-dep / 0.05);
+  col += redLights(az + (vnoise(vec2(wp.y * 0.3, tw)) - 0.5) * dep * 0.1 * wobA, HOR + dep * 0.25 + 0.01, blur + 1.5, t) * 0.25 * exp(-dep / 0.05);
   return col;
 }
 
@@ -503,15 +519,30 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
   if (el < HOR) {
     float dep = max(HOR - el, 0.0004);
     vec2 wp = vec2(az / dep, 1.0 / dep);
-    float rip = fbm3(vec2(wp.x * 0.9, wp.y * 0.55 - t * 0.35)) - 0.5;
-    col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) + rip * 0.07;
-    col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud));   // con il sereno l'acqua prende l'azzurro del cielo
+    // il vento cambia le onde (vedi water): calma = specchio liscio e chiaro; vento = increspature fitte, acqua piu' scura
+    float tw = uWaveT, rf = wm(0.55, 1.0, 1.7), rh = wm(0.3, 1.0, 3.0);
+    float big = fbm3(vec2(wp.x * 0.9 * rf, wp.y * 0.55 * rf - tw * 0.35));
+    float rip = (big - 0.5) * rh;
+    col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) * wm(1.0, 1.0, 0.62) + rip * 0.07;
+    col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud) + wm(0.22, 0.0, -0.1));   // con il sereno l'acqua prende l'azzurro del cielo; con la calma ne e' lo specchio
     // Il ponte capovolto nell'acqua: la stessa sagoma (arcata, impalcato, spalle) specchiata sotto la linea di riva,
     // mossa dalle onde e sempre piu' sbiadita e rotta allontanandosi. Prima era una fascia scura dai bordi netti.
     float u = townU(az) + rip * (0.03 + dep * 3.0);
+    // creste bianche, rade e piccole verso il largo: solo con vento forte, dove l'onda grossa e' alta e una seconda grana e' accesa
+    float ws = clamp(uWind * 2.0 - 1.0, 0.0, 1.0);
+    if (ws > 0.0) {
+      float fine = vnoise(vec2(wp.x * 2.6, wp.y * 1.5 - tw * 0.9));
+      float far = smoothstep(0.012, 0.05, dep) * (1.0 - 0.5 * smoothstep(0.1, 0.25, dep));
+      float swell = vnoise(vec2(wp.x * 0.3, wp.y * 1.2 - tw * 0.6));          // lunghe ondulazioni: bande scure e chiare di traverso
+      col *= 1.0 - 0.22 * ws * (swell - 0.4) * far;
+      col += vec3(0.07, 0.09, 0.10) * ws * smoothstep(0.50, 0.68, big) * far;   // il fianco dell'onda rivolto al cielo si schiarisce
+      float cap = smoothstep(0.57, 0.70, big) * smoothstep(0.60, 0.80, fine) * far;
+      col = mix(col, vec3(0.82, 0.87, 0.90), cap * 0.7 * ws);
+    }
     if (abs(u) < 1.2) {
       float ry = dep * 1.1;
-      float brk = 0.5 + 0.5 * smoothstep(0.3, 0.7, fbm3(vec2(wp.x * 2.3, wp.y * 1.4 - t * 0.5)));
+      float brk = 0.5 + 0.5 * smoothstep(0.3, 0.7, fbm3(vec2(wp.x * 2.3 * rf, wp.y * 1.4 * rf - tw * 0.5)));
+      brk = mix(brk, 1.0, 0.6 * clamp(1.0 - uWind * 2.0, 0.0, 1.0));       // con la calma il ponte si specchia quasi intero
       float yb = abs(u) < 1.0 ? bridgeUnder(u) : 0.0;
       vec3 steel = mix(mix(vec3(0.12, 0.16, 0.20), vec3(0.26, 0.33, 0.38), smoothstep(yb, DECK, ry)), daySky(az, HOR + 0.02, t), 0.3);
       col = mix(col, steel * 0.78, bridgeMask(u, ry, 0.0014 + dep * 0.06) * brk * 0.85 * exp(-dep / 0.09));
@@ -655,7 +686,7 @@ export function createGlass() {
   // uso bloccava la pagina per 7-8 secondi (compilazione), e prepararla prima con compileAsync non serviva.
   // cielo vero ("dal vivo"): le stelle si disegnano su questa tela (room.setHeavens) e lo shader le legge come texture
   const skyCanvas = canvas(1536, 768), skyTex = tex(skyCanvas, { mips: false });
-  const shared = { uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 } };
+  const shared = { uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 }, uWind: { value: 0.5 }, uWaveT: { value: 0 } };
   const material = (MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms: { ...shared, uAlpha: { value: 1 } }, defines: { MODE }, transparent: true });
   const variants = [0, 1].map(material);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), variants[0]);
@@ -772,6 +803,7 @@ void main() {
   projection.visible = false;
   group.add(projection);
   let pjLines = null, pjNight = true;
+  let windTarget = 0.5, waveExtra = 0;   // vento verso cui il mare si porta; scarto accumulato del tempo delle onde
   function drawProjection() {
     const x = pjCtx, W = PJ.cw;
     x.clearRect(0, 0, W, PJ.ch);
@@ -919,7 +951,8 @@ void main() {
       projection.visible = !!lines;
       drawProjection();
     },
-    setSky({ day: k, rain = 1, cloud = 1, warm = 0 }) {
+    setSky({ day: k, rain = 1, cloud = 1, warm = 0, wind = 0.5 }) {
+      windTarget = wind;   // il vento arriva piano: lo porta update
       if ((k < 0.5) !== pjNight) {   // la proiezione cambia veste tra notte e giorno
         pjNight = k < 0.5;
         pjMat.uniforms.uNight.value = pjNight ? 1 : 0;
@@ -948,7 +981,15 @@ void main() {
       poster.userData.spill.opacity = L(0.22, 0, k);
       cove.material.color.setRGB(L(2.2, 0.9, k), L(1.3, 0.6, k), L(0.45, 0.3, k));
     },
-    update(t) {
+    update(t, dt = 0) {
+      const U = glass.material.uniforms;
+      // il vento cambia piano (circa due secondi): niente scatti. Il tempo delle onde accumula solo lo scarto dalla
+      // velocita' di sempre (con vento 0.5 e' zero, e uWaveT resta uguale a t), cosi' un cambio di vento non fa saltare le onde.
+      const wd = windTarget - U.uWind.value;
+      U.uWind.value = Math.abs(wd) < 0.0005 ? windTarget : U.uWind.value + wd * (1 - Math.exp(-dt / 1.6));
+      const v = U.uWind.value;
+      waveExtra += dt * (v < 0.5 ? -(0.5 - v) * 1.2 : (v - 0.5) * 2.4);
+      U.uWaveT.value = t + waveExtra;
       glass.material.uniforms.uTime.value = t;
       pjMat.uniforms.uTime.value = t;
     },
