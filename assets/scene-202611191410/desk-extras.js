@@ -628,7 +628,7 @@ export function createExtras(data) {
   const printerObj = printer(M);
   place(printerObj.group, -0.9, 0.08, 0.28, root);
   place(prints(), -0.63, 0.1, 0.4);
-  const hp = place(headphones(M), -0.6, 0.33, 0.5, root);
+  const hp = place(headphones(M), -0.8, 0.37, 0.5, root);   // a sinistra, accanto alla stampante: non copre i pezzi laser
   const hh = place(handheld(M, data.game.name), -0.125, 0.335, -0.2, root);   // si clicca: la scheda di Ctrl-Alt-Revenge
   place(cabinet(M), 1.035, -0.27, -0.1);
   const bb = place(breadboard(M), 0.19, 0.315, 0.12);

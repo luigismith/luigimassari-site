@@ -257,4 +257,40 @@
       });
     });
   })();
+
+  // Portfolio: filtri per area e galleria sfogliabile di lavoro in lavoro (le foto dei lavori visibili, in fila).
+  // Usato dalla pagina /portfolio/ e dal pannello del profilo nella scena (window.lmPortfolio).
+  (function () {
+    window.lmPortfolio = function (works, start, t) {
+      var list = [], first = 0;
+      works.forEach(function (w, k) {
+        if (k === start) first = list.length;
+        w.i.forEach(function (src, n) { list.push({ src: src, alt: w.t + (n === 0 ? " — " + w.d : "") }); });
+      });
+      if (window.lmLightbox && list.length) window.lmLightbox(list, first, t);
+    };
+    var root = document.querySelector("[data-portfolio]");
+    if (!root) return;
+    var data = JSON.parse(root.querySelector("[data-portfolio-data]").textContent);
+    var t = { close: root.dataset.close, prev: root.dataset.prev, next: root.dataset.next };
+    var cards = Array.prototype.slice.call(root.querySelectorAll(".pf-card"));
+    var buttons = Array.prototype.slice.call(root.querySelectorAll("[data-filter]"));
+    function visible() { return cards.filter(function (c) { return !c.hidden; }); }
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var f = b.dataset.filter;
+        buttons.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        cards.forEach(function (c) { c.hidden = !!f && c.dataset.cat !== f; });
+      });
+    });
+    root.querySelectorAll("a[data-work]").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button || !window.lmLightbox) return;
+        e.preventDefault();
+        var vis = visible().map(function (c) { return +c.dataset.index; }).filter(function (k) { return data[k].i.length; });
+        var works = vis.map(function (k) { return data[k]; });
+        window.lmPortfolio(works, vis.indexOf(+a.dataset.work), t);
+      });
+    });
+  })();
 })();

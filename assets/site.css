@@ -583,3 +583,24 @@ a:hover, .theme-dark a:hover { color: var(--accent); }
 .lightbox .lb-next { right: 16px; }
 .lightbox.lb-single .lb-prev, .lightbox.lb-single .lb-next { display: none; }
 @media (max-width: 700px) { .lightbox .lb-prev, .lightbox .lb-next { top: auto; bottom: 16px; transform: none; } }
+
+/* portfolio: filtri e schede */
+.pf-filters { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s6); }
+.pf-filters button { font: inherit; font-size: 15px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line, rgba(255,255,255,.2)); background: transparent; color: inherit; cursor: pointer; }
+.pf-filters button span { opacity: .6; margin-left: 4px; }
+.pf-filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #14100a; }
+.pf-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s6) var(--s5); }
+.pf-card[hidden] { display: none; }
+.pf-art { position: relative; display: block; border-radius: 6px; overflow: hidden; cursor: zoom-in; }
+.pf-art img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; transition: transform .3s; }
+.pf-art:hover img { transform: scale(1.03); }
+.pf-art-text { aspect-ratio: 3 / 2; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1b2430, #2b3440); color: #e9ece6; cursor: pointer; text-decoration: none; }
+.pf-art-text span { font-size: clamp(24px, 3vw, 34px); font-weight: 800; font-stretch: var(--wide); letter-spacing: -0.01em; padding: 0 var(--s4); text-align: center; }
+.pf-count { position: absolute; right: 10px; bottom: 10px; background: rgba(6, 8, 12, .72); color: #fff; font-size: 13px; padding: 3px 9px; border-radius: 999px; }
+.pf-meta { margin-top: var(--s3); }
+.pf-meta p { color: var(--muted); line-height: 1.5; margin-top: var(--s2); }
+.pf-meta .pf-cat { color: var(--accent); font-size: 14px; margin-top: 0; }
+.pf-meta .h3 { margin-top: var(--s1); }
+@media (prefers-reduced-motion: reduce) { .pf-art img { transition: none; } }
+.pf-preview { list-style: none; padding: 0; margin: var(--s3) 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s2); }
+.pf-preview img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
