@@ -224,6 +224,7 @@ export class UI {
         h("ul", { class: "sp-products" }, this.productButtons.map((b) => h("li", {}, b)))),
       this.card,
       this.galleryBlock("synth", this.data.gallery.hsynth),
+      this.galleryBlock("console", this.data.gallery.hconsole, this.data.gallery.pconsole),
       h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: s.page }, s.page_label)),
     ];
     if (this.selected) queueMicrotask(() => this.showProduct(this.selected, false));
@@ -341,13 +342,14 @@ export class UI {
   labPanel() { const l = this.data.lab; return this.itemsPanel(l, { href: l.more_href, label: l.more }); }
   // foto dei lavori: miniature con didascalia; un clic apre la foto intera in una nuova scheda
   // foto dei lavori: miniature con didascalia; un clic apre la galleria in sovraimpressione (window.lmLightbox, site.js)
-  galleryBlock(key, title) {
+  galleryBlock(key, title, intro = null) {
     const g = this.data.gallery;
     if (!g || !g[key] || !g[key].length) return null;
     const list = g[key].map((x) => ({ src: x.src, alt: x.alt }));
     const labels = { close: g.close, prev: g.prev, next: g.next };
     return h("div", { class: "sp-section" },
       h("h3", { class: "sp-h" }, title),
+      intro ? h("p", {}, intro) : null,
       h("ul", { class: "sp-gallery" }, g[key].map((x, i) => h("li", {},
         h("a", {
           href: x.src,
