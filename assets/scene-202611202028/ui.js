@@ -45,6 +45,7 @@ export class UI {
     this.closeTimer = 0;
     this.selected = null;
     this.handlers = {};
+    this.done = 0; // dove e' arrivata la barra di caricamento
     root.classList.add("is-intro");
     this.trapIntro();
     root.querySelectorAll("[data-sound-choice]").forEach((b) => {
@@ -58,10 +59,23 @@ export class UI {
   on(name, fn) { this.handlers[name] = fn; }
   emit(name, ...args) { if (this.handlers[name]) this.handlers[name](...args); }
 
-  progress(f) {
-    const pct = Math.round(Math.max(0, Math.min(1, f)) * 100);
-    this.bar.style.width = pct + "%";
-    this.progressEl.setAttribute("aria-valuenow", String(pct));
+  // Barra di caricamento: f da 0 a 1, solo in avanti (un valore piu' basso si ignora). ms: in quanto tempo ci arriva;
+  // oltre i 400 ms va a velocita' costante, per le fasi di durata nota (la misura degli fps).
+  progress(f, ms = 250) {
+    f = Math.min(1, f);
+    if (!(f > this.done)) return;
+    this.done = f;
+    // la partenza l'ha animata site.js mentre arrivavano i moduli: si riparte dal punto in cui e' arrivata
+    const lead = this.bar.getAnimations ? this.bar.getAnimations().find((a) => a.id === "lm-lead") : null;
+    if (lead) {
+      this.bar.style.transform = getComputedStyle(this.bar).transform;
+      lead.cancel();
+      void getComputedStyle(this.bar).transform;
+    }
+    this.bar.style.setProperty("--bar-ms", ms + "ms");
+    this.bar.style.setProperty("--bar-ease", ms > 400 ? "linear" : "ease");
+    this.bar.style.transform = `scaleX(${f})`;
+    this.progressEl.setAttribute("aria-valuenow", String(Math.round(f * 100)));
   }
 
   // l'ingresso e' un dialogo modale: Tab resta dentro
@@ -88,6 +102,7 @@ export class UI {
       onEnter({ sound: this.sound, auto });
     };
     if (saved === "1" || saved === "0") { this.sound = saved === "1"; go(true); return; }
+    this.progress(1);
     this.enterBtn.disabled = false;
     this.enterBtn.focus({ preventScroll: true });
     this.enterBtn.addEventListener("click", () => go(false), { once: true });
@@ -225,6 +240,8 @@ export class UI {
       this.card,
       this.galleryBlock("synth", this.data.gallery.hsynth),
       h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: s.page }, s.page_label)),
+      // lo stesso catalogo che si apre dal poster sulla parete sinistra: qui c'e' per chi usa la tastiera
+      h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: s.catalog_href, ...EXT }, s.catalog_label, extMark(this.data.ui.new_tab))),
     ];
     if (this.selected) queueMicrotask(() => this.showProduct(this.selected, false));
     return out;
@@ -258,9 +275,10 @@ export class UI {
     card.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }
 
-  // il tablet: il portfolio (tutti i lavori, ognuno si apre nella sua scheda) e sotto il profilo
+  // il tablet: il portfolio (tutti i lavori, ognuno si apre nella sua scheda), una riga Open con il link al blocco
+  // della home classica e il profilo breve
   aboutPanel() {
-    const a = this.data.about, hash = this.data.hash, pf = a.portfolio;
+    const a = this.data.about, pf = a.portfolio;
     const open = (i) => (e) => { if (window.lmWorks) { e.preventDefault(); window.lmWorks(pf.works, i, pf.labels); } };
     return [
       this.title(a.h),
@@ -274,22 +292,10 @@ export class UI {
       h("div", { class: "sp-actions" }, h("a", { class: "btn btn-secondary", href: pf.page }, pf.all)),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, a.open_h),
-        h("p", {}, pf.open_p),
-        h("ul", { class: "sp-list" }, a.open.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
+        h("p", {}, pf.open_p, " ", h("a", { class: "sp-link", href: a.open_href }, a.open_more))),
       h("div", { class: "sp-section" },
         h("h3", { class: "sp-h" }, pf.profile_h),
         ...a.p.map((p) => h("p", {}, p))),
-      h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, a.skills_h),
-        h("ul", { class: "sp-list" }, a.skills.map(([t, p]) => h("li", {}, h("h3", {}, t), h("p", {}, p))))),
-      h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, a.explore_h),
-        h("ul", { class: "sp-doors" }, a.explore.map((x) => h("li", {},
-          h("a", { href: "#" + hash[x.view] }, h("span", { class: "dh" }, x.h, h("span", { "aria-hidden": "true" }, " →")), h("span", { class: "dp" }, x.p)))))),
-      h("div", { class: "sp-section" },
-        h("h3", { class: "sp-h" }, a.projects_h),
-        h("ul", { class: "sp-list" }, a.projects.map(([n, u, d]) => h("li", {},
-          h("h3", {}, h("a", { class: "sp-link", href: u, ...EXT }, n, extMark(this.data.ui.new_tab))), h("p", {}, d))))),
       a.cv ? h("div", { class: "sp-actions" }, h("a", { class: "sp-link", href: a.cv }, a.cv_label)) : null,
     ];
   }
@@ -371,7 +377,11 @@ export class UI {
         h("p", { "aria-hidden": "true" }, x.alt)))),
       h("p", { class: "note" }, g.note));
   }
-  printPanel() { return [...this.itemsPanel(this.data.print), this.galleryBlock("3d", this.data.gallery.h3d)]; }
+  // la stampa 3D: solo le voci sul 3D; il laser ha la sua scheda, raggiunta dal pulsante secondario
+  printPanel() {
+    const d = this.data.print;
+    return [...this.itemsPanel(d, d.more ? { href: d.more_href, label: d.more } : null), this.galleryBlock("3d", this.data.gallery.h3d)];
+  }
 
   // il taglio laser: i pezzi sul banco (pannello e scatola a incastri), con un esempio vero
   laserPanel() {

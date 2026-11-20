@@ -121,28 +121,97 @@ export function createDesk() {
   return { group: g, woodMap: wood.map };
 }
 
-// --- lampada: barra LED su stelo sottile ---------------------------------------
+// --- lampada: da architetto, a LED -------------------------------------------------
+// Base pesante dietro la stampante, montante fino al gomito (con la manopola della frizione), braccio corto e testa
+// piatta inclinata verso il banco. Il gomito e' il punto piu' alto (1,37 m): dalla vista d'insieme resta sotto la
+// linea della costa, cosi' la lampada non taglia il panorama ne' il montante della vetrata; la testa finisce a
+// sinistra del monitor, senza coprirlo. Da sopra il diffusore non si vede: la luce si legge dal filo acceso sul
+// fianco della testa e dalla pozza calda sul banco.
+// power: la testa e' piu' vicina al banco della vecchia barra, quindi la luce va ridotta in proporzione per lasciare
+// uguale quella sul piano (main.js moltiplica per power l'intensita' di notte e di giorno).
 export function createLamp() {
   const g = new THREE.Group();
   g.name = "lamp";
-  const metal = new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.35, metalness: 0.85 });
-  const base = V(-0.99, DESK.y, -0.3);
-  const barA = V(-0.99, 1.56, -0.3), barB = V(-0.16, 1.56, -0.1);
-  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, 0.012, 40), metal);
-  foot.position.copy(base).add(V(0, 0.006, 0));
-  g.add(foot, rod(base, barA, 0.008, metal), rod(barA, barB, 0.011, metal, 12));
-  // striscia luminosa sotto la barra: e' lei che fa bloom
-  const dir = new THREE.Vector3().subVectors(barB, barA);
-  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.004, dir.length() * 0.72), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2.2, 1.2) }));
-  strip.position.copy(barA).addScaledVector(dir, 0.6).add(V(0, -0.012, 0));
-  strip.lookAt(strip.position.clone().add(dir));
-  g.add(strip);
-  shadow(g, true, true);
-  strip.castShadow = false;
+  const metal = new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.32, metalness: 0.85 });
+  const soft = new THREE.MeshStandardMaterial({ color: 0x101215, roughness: 0.85, metalness: 0.1 });   // piano della base, gommato
+  const amber = new THREE.MeshStandardMaterial({ color: 0xf2a33a, roughness: 0.35, metalness: 0.6 });
+  const light = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2.2, 1.2) });               // diffusore: fa bloom
+  const seamMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.5, 0.8) });
+  const up = V(0, 1, 0);
+  const d = V(0.85, 0, 0.525).normalize();          // verso il banco, in pianta
+  const p = V(-d.z, 0, d.x);                        // asse degli snodi, orizzontale (verso la camera)
+  const B = V(-0.98, DESK.y, -0.31);
+  const J0 = B.clone().add(V(0, 0.04, 0));
+  const E = J0.clone().addScaledVector(d, 0.05).add(V(0, 0.58, 0));          // gomito
+  const J1 = E.clone().addScaledVector(d, 0.2);                              // snodo della testa: braccio orizzontale
+  const a = d.clone().multiplyScalar(Math.cos(0.4)).addScaledVector(up, -Math.sin(0.4)).normalize();     // testa inclinata di 23 gradi
 
-  // unica luce calda forte
+  // barra piatta smussata da A a B: larga lungo l'asse degli snodi, sottile nel piano della lampada
+  const flat = (A, Bp, w, t, mat) => {
+    const dir = Bp.clone().sub(A), len = dir.length();
+    const m = new THREE.Mesh(new RoundedBoxGeometry(w, t, len, 2, Math.min(w, t) * 0.45), mat);
+    m.position.copy(A).addScaledVector(dir, 0.5);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(p, dir.clone().normalize().cross(p).normalize(), dir.normalize()));
+    return m;
+  };
+  // snodo: cilindro con l'asse lungo p
+  const pin = (at, r, len, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 24), mat); m.position.copy(at); m.quaternion.setFromUnitVectors(up, p); return m; };
+
+  // base
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.077, 0.018, 48), metal);
+  foot.position.copy(B).add(V(0, 0.009, 0));
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.003, 48), soft);
+  top.position.copy(B).add(V(0, 0.0195, 0));
+  const touch = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.002, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.2, 0.3) }));
+  touch.position.copy(B).addScaledVector(p, 0.045).add(V(0, 0.0215, 0));   // spia del tasto a sfioramento, verso la camera
+  const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, 0.024, 20), metal);
+  yoke.position.copy(B).add(V(0, 0.03, 0));
+  g.add(foot, top, touch, yoke, pin(J0, 0.011, 0.03, metal));
+
+  // montante
+  g.add(flat(J0, E, 0.018, 0.011, metal));
+  // gomito: lo snodo con la manopola della frizione verso la camera e un anello ambra
+  g.add(pin(E, 0.016, 0.034, metal), pin(E, 0.0166, 0.004, amber));
+  const knobE = pin(E.clone().addScaledVector(p, 0.024), 0.019, 0.014, metal);
+  g.add(knobE);
+  const boom = J1.clone().sub(E).normalize();
+  g.add(flat(E, J1, 0.014, 0.009, metal), pin(J1, 0.0105, 0.03, metal));
+
+  // testa: corpo piatto, diffusore sotto, filo di luce sul fianco verso la camera
+  const HL = 0.25, HW = 0.058, HT = 0.015;
+  const hc = J1.clone().addScaledVector(a, HL / 2 + 0.006);
+  const hb = new THREE.Matrix4().makeBasis(p, a.clone().cross(p).normalize(), a);
+  const headQ = new THREE.Quaternion().setFromRotationMatrix(hb), hn = p.clone().cross(a).normalize();   // hn: in su, perpendicolare alla testa
+  const head = new THREE.Mesh(new RoundedBoxGeometry(HW, HT, HL, 3, 0.006), metal);
+  head.position.copy(hc); head.quaternion.copy(headQ);
+  const diff = new THREE.Mesh(new THREE.BoxGeometry(HW - 0.012, 0.002, HL - 0.016), light);
+  diff.position.copy(hc).addScaledVector(hn, -HT / 2 - 0.0006); diff.quaternion.copy(headQ);
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.0012, 0.0018, HL - 0.02), seamMat);
+  seam.position.copy(hc).addScaledVector(p, HW / 2 + 0.0004).addScaledVector(hn, -HT / 2 + 0.002); seam.quaternion.copy(headQ);
+  g.add(head, diff, seam);
+
+  // cavo in tessuto: esce dalla testa, segue il braccio, fa un'ansa al gomito, scende dietro il montante e lascia il banco
+  const behind = d.clone().negate();
+  const cable = new THREE.CatmullRomCurve3([
+    J1.clone().addScaledVector(hn, 0.004).addScaledVector(a, 0.01),
+    J1.clone().addScaledVector(boom, -0.06).add(V(0, -0.012, 0)),
+    E.clone().addScaledVector(behind, 0.03).add(V(0, -0.035, 0)),
+    E.clone().addScaledVector(behind, 0.016).add(V(0, -0.2, 0)),
+    J0.clone().addScaledVector(behind, 0.016).add(V(0, 0.08, 0)),
+    B.clone().addScaledVector(behind, 0.06).add(V(0, 0.004, 0)),
+    V(B.x - 0.04, DESK.y + 0.003, DESK.z0 + 0.01),
+    V(B.x - 0.05, DESK.y - 0.06, DESK.z0 - 0.02),
+    V(B.x - 0.08, 0.02, DESK.z0 - 0.05),
+  ], false, "catmullrom", 0.4);
+  const cord = new THREE.Mesh(new THREE.TubeGeometry(cable, 90, 0.0022, 8, false), soft);
+  g.add(cord);
+
+  shadow(g, true, true);
+  for (const m of [diff, seam, touch, cord]) m.castShadow = false;
+
+  // unica luce calda forte, dal diffusore verso il centro del banco
   const spot = new THREE.SpotLight(0xffd0a0, 1.7, 4.5, 0.85, 0.8, 2);
-  spot.position.copy(strip.position).add(V(0, -0.012, 0));
+  spot.position.copy(hc).addScaledVector(hn, -0.02);
   spot.target.position.set(-0.2, DESK.y, 0.04);
   spot.castShadow = true;
   spot.shadow.mapSize.set(2048, 2048);
@@ -155,7 +224,8 @@ export function createLamp() {
   const bounce = new THREE.PointLight(0xffb070, 0.22, 1.6, 2);
   bounce.position.set(-0.3, 1.3, 0.25);
   g.add(bounce);
-  return { group: g, spot, bulb: strip, head: strip };
+  const power = (spot.position.distanceTo(spot.target.position) / 0.866) ** 2;   // 0,866 m: distanza della vecchia barra dal centro del banco
+  return { group: g, spot, power, bulb: diff, head: diff };
 }
 
 // ---------------------------------------------------------------------------
@@ -792,9 +862,7 @@ export async function createObjects(ctx, woodMap, onProgress = () => {}) {
   updaters.push(recorder.update);
   sections.contact = recorder.group;
 
-  const mug = createMug();
-  place(mug.group, 0.14, -0.08, 2.4);
-  updaters.push(mug.update);
+  // la tazza (createMug) stava davanti al monitor: tolta il 2026-11-20
 
   // cavi patch tra gli strumenti
   const Y = DESK.y;

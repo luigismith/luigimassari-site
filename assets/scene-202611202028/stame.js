@@ -1,8 +1,11 @@
-// Stame com'e' davvero (github.com/luigismith/stame, hardware/case, versione stampata NES): una console bassa
-// e lunga in PETG color crema, 583,5 x 240 x 45 mm. A sinistra la MPK mini IV sotto la mascherina nera con le
-// scritte rosse (si vedono tasti, pad, manopole e ruote); a destra, davanti, il macro pad con quindici tasti
-// meccanici trasparenti e tre manopole di alluminio; dietro, la Miyoo Flip aperta nella sua culla, con la
-// visiera fume' e lo schermo acceso; sui fianchi le targhe grigie con il nome e il marchio dei tre stami.
+// Stame com'e' davvero (github.com/luigismith/stame, hardware/case), nella prima versione, quella tagliata al laser:
+// una console bassa e lunga, 583,5 x 240 x 45 mm, di betulla (fianchi a quattro strati, base, retro, costola, parete
+// davanti) con i bordi bruciati dal laser, e acrilico nero inciso per la mascherina e il piano della Flip. A sinistra
+// la MPK mini IV sotto la mascherina con le legende incise (si vedono tasti, pad, manopole e ruote); a destra, davanti,
+// il macro pad con quindici tasti meccanici trasparenti e tre manopole di alluminio, nella sua culla di PETG nero;
+// dietro, la Miyoo Flip aperta nella sua culla, con la visiera fume' e lo schermo acceso; sui fianchi il nome e il
+// marchio dei tre stami incisi nel legno. Fino al 2026-11-20 la scena aveva la versione stampata NES, color crema:
+// era la superficie chiara piu' grande del banco e tirava l'occhio piu' del monitor.
 // Le misure vengono da hardware/case/misure.py (millimetri: x da sinistra, y dal retro verso il musicista).
 import * as THREE from "three";
 import { box, shadow } from "./desk-objects.js";
@@ -12,6 +15,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const S = 0.001;                                    // mm -> m
 const W = 583.5, D = 240, H = 45;                   // la console
 const RED = "#e4382c";
+const ENGRAVE = "#d8ccb0", BURN = "#4a2a14";   // incisione sull'acrilico nero (sabbia) e bruciatura sul legno
 const CHORDS = [["C", "maj"], ["A", "m7"], ["F", "M7"], ["G", "sus"]];
 
 // un pezzo a forma di scatola, dato con gli estremi in millimetri (x0..x1, y0..y1, z0..z1)
@@ -23,11 +27,11 @@ function part(mat, x0, x1, y0, y1, z0, z1, r = 1.2) {
 const at = (x, y, z) => V((x - W / 2) * S, z * S, (y - D / 2) * S);
 
 // il marchio: tre stami che salgono da un ricettacolo, le antere come teste di nota
-function stamens(x, cx, cy, s) {
+function stamens(x, cx, cy, s, color = RED) {
   x.save();
   x.translate(cx, cy);
   x.scale(s, s);
-  x.strokeStyle = x.fillStyle = RED;
+  x.strokeStyle = x.fillStyle = color;
   x.lineWidth = 2.2;
   x.lineCap = "round";
   for (const [dx, h] of [[-9, 20], [0, 26], [9, 20]]) {
@@ -38,7 +42,7 @@ function stamens(x, cx, cy, s) {
   x.restore();
 }
 
-// la mascherina: acrilico nero, i fori dei comandi della MK4 e le legende rosse di Stame (4 px per mm)
+// la mascherina: acrilico nero, i fori dei comandi della MK4 e le legende di Stame incise, color sabbia (4 px per mm)
 const PXM = 4, MX0 = 16, MX1 = 371.5, MY0 = 12, MY1 = 138, MK4X = 18, MK4Y = 44;
 function maskCanvas() {
   const c = canvas((MX1 - MX0) * PXM, (MY1 - MY0) * PXM), x = c.getContext("2d");
@@ -51,7 +55,7 @@ function maskCanvas() {
   };
   const label = (t, mx, my, size = 3.2, align = "center") => {
     const [cx, cy] = p(mx, my);
-    x.fillStyle = RED; x.textAlign = align; x.font = `600 ${size * PXM}px ${FONT}`;
+    x.fillStyle = ENGRAVE; x.textAlign = align; x.font = `600 ${size * PXM}px ${FONT}`;
     x.fillText(t, cx, cy);
   };
   for (const [mx, my] of [[22.9, 37.1], [53.7, 37.1]]) hole(mx, my, 14, 46, 4);                    // ruote
@@ -67,21 +71,37 @@ function maskCanvas() {
   ["UNDO", "LOOP", "PLAY", "REC", "DUB"].forEach((t, i) => label(t, [252.9, 273.8, 294.1, 314.2, 334.2][i], 85.5, 2.5));
   label("BEND", 22.9, 66, 2.6); label("MOD", 53.7, 66, 2.6);
   // il marchio e il nome, sulla zona dei cavi dietro la MK4
-  stamens(x, 24 * PXM, 19 * PXM, 0.62 * PXM / 4 * 2);
-  x.fillStyle = RED; x.textAlign = "left";
+  stamens(x, 24 * PXM, 19 * PXM, 0.62 * PXM / 4 * 2, ENGRAVE);
+  x.fillStyle = ENGRAVE; x.textAlign = "left";
   x.font = `700 ${9 * PXM}px ${FONT}`; x.fillText("STAME", 34 * PXM, 22 * PXM);
   x.font = `500 ${3.4 * PXM}px ${FONT}`; x.fillText("STAMEN HARMONICUM", 34.5 * PXM, 28.5 * PXM);
   return c;
 }
 
-// la targa grigia di un fianco: il nome e il marchio, in rosso (3 px per mm; 200 x 32 mm)
+// betulla: fondo miele con venature fini e lunghe (lungo x)
+function birchCanvas(w, h, seed = 5) {
+  const c = canvas(w, h), x = c.getContext("2d");
+  x.fillStyle = "#c9a674"; x.fillRect(0, 0, w, h);
+  let s = seed;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < h * 0.8; i++) {
+    const y = r() * h, a = 0.04 + r() * 0.08;
+    x.strokeStyle = r() < 0.6 ? `rgba(120,82,44,${a})` : `rgba(240,214,170,${a})`;
+    x.lineWidth = 0.5 + r() * 1.2;
+    x.beginPath(); x.moveTo(0, y);
+    for (let px = 0; px <= w; px += 16) x.lineTo(px, y + Math.sin(px * 0.01 + i) * 1.5);
+    x.stroke();
+  }
+  return c;
+}
+
+// il fianco di betulla con il nome e il marchio bruciati dal laser (3 px per mm; 200 x 32 mm)
 function plateCanvas() {
-  const c = canvas(600, 96), x = c.getContext("2d");
-  x.fillStyle = "#4f5257"; x.fillRect(0, 0, 600, 96);
-  x.fillStyle = RED; x.textAlign = "right";
+  const c = birchCanvas(600, 96, 11), x = c.getContext("2d");
+  x.fillStyle = BURN; x.textAlign = "right";
   x.font = `700 40px ${FONT}`; x.fillText("STAME", 470, 54);
   x.font = `500 14px ${FONT}`; x.fillText("STAMEN HARMONICUM", 470, 76);
-  stamens(x, 530, 52, 1.35);
+  stamens(x, 530, 52, 1.35, BURN);
   return c;
 }
 
@@ -123,21 +143,35 @@ export function createStame(M, product) {
   const inner = new THREE.Group();
   g.add(inner);
   const std = (color, roughness, metalness = 0, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
-  const cream = std(0xe4d6b6, 0.74), grey = std(0x55585d, 0.62), deck = std(0x2d2f34, 0.42, 0.05);
+  const deck = std(0x2d2f34, 0.42, 0.05);
   const mkBody = std(0xd6d8d6, 0.55), mkDark = std(0x2a2c30, 0.6), red = std(0xc8261b, 0.5);
   const white = std(0xf1f1ec, 0.36), black = std(0x141518, 0.42), alu = std(0xc9ccd0, 0.26, 1);
   const knobGrey = std(0x9a9ea3, 0.48, 0.2), padTop = std(0x1a1b1e, 0.7);
 
-  // --- la console stampata: base, fianchi, retro, costola, parete davanti a destra ---
+  // --- la console di betulla: base, fianchi, retro, costola, parete davanti a destra ---
+  // Del legno si vedono le facce (fuori dei fianchi, parete davanti) e i bordi tagliati, che il laser brucia: in cima
+  // e in testa ai fianchi, il bordo della base, la cima del retro e della costola.
+  const birch = std(0xffffff, 0.6, 0, { map: tex(birchCanvas(512, 128)) }), burnt = std(0x3b2414, 0.82);
+  const petg = std(0x18191c, 0.55);                          // culle stampate in PETG nero
   inner.add(
-    part(cream, 0, W, 0, D, 0, 6, 1.5),
-    part(cream, 0, 16, 0, D, 0, H, 6),
-    part(cream, W - 16, W, 0, D, 0, H, 6),
-    part(cream, 16, W - 16, 8, 16, 0, H),
-    part(cream, 367.5, 375.5, 16, 236, 0, H),
-    part(cream, 375.5, W - 16, 152, D, 0, H - 0.4),           // la culla del pad, a filo del piano
+    part(burnt, 0, W, 0, D, 0, 6, 1.5),
+    part(birch, 0, 16, 0, D, 0, H, 6),
+    part(birch, W - 16, W, 0, D, 0, H, 6),
+    part(birch, 16, W - 16, 8, 16, 0, H),
+    part(birch, 367.5, 375.5, 16, 236, 0, H),
+    part(petg, 375.5, W - 16, 152, 236, 0, H - 0.4),          // la culla del pad, a filo del piano
+    part(birch, 375.5, W - 16, 236, D, 0, 37, 0.8),          // la parete davanti, fin dove comincia la curva dei fianchi
+    part(petg, 375.5, W - 16, 236, D - 0.6, 37, H - 0.4, 0.6),
+    // bordi bruciati
+    part(burnt, 2, 14, 6, D - 6, H - 0.6, H + 0.15, 0.4),
+    part(burnt, W - 14, W - 2, 6, D - 6, H - 0.6, H + 0.15, 0.4),
+    part(burnt, 2, 14, D - 0.8, D + 0.1, 6, H - 6, 0.3),
+    part(burnt, W - 14, W - 2, D - 0.8, D + 0.1, 6, H - 6, 0.3),
+    part(burnt, 16, W - 16, 8.2, 15.8, H - 0.6, H + 0.15, 0.3),
+    part(burnt, 367.7, 375.3, 16, 236, H - 0.6, H + 0.15, 0.3),
+    part(burnt, 375.5, W - 16, D - 0.8, D + 0.1, 36.2, 37.1, 0.3),
   );
-  // targhe grigie sui fianchi, con il nome e il marchio
+  // il nome e il marchio incisi sui fianchi
   const plateMat = std(0xffffff, 0.6, 0, { map: tex(plateCanvas()) });
   for (const side of [-1, 1]) {           // ruotata verso l'esterno, la targa si legge dritta su tutti e due i fianchi
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(200 * S, 32 * S), plateMat);
@@ -206,7 +240,7 @@ export function createStame(M, product) {
 
   // --- la Miyoo Flip nella sua culla: la meta' con i tasti e il coperchio aperto a 65 gradi ---
   const FX = 471.5, FY0 = 50.6, FW = 84, FD = 80.35, FH = 12.25;
-  inner.add(part(cream, FX - 45, FX + 45, FY0 - 3, FY0 + FD + 3, H, H + 7, 2));
+  inner.add(part(petg, FX - 45, FX + 45, FY0 - 3, FY0 + FD + 3, H, H + 7, 2));
   const flipWhite = std(0xeeeeea, 0.42);
   inner.add(part(flipWhite, FX - FW / 2, FX + FW / 2, FY0, FY0 + FD, H + 2, H + 2 + FH, 5));
   const top = H + 2 + FH;

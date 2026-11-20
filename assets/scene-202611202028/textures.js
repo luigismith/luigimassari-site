@@ -125,6 +125,91 @@ export function woodTextures(seed = 7) {
   return { map: tex(c), roughnessMap: tex(rc, { srgb: false }) };
 }
 
+// --- parquet di rovere a spina di pesce -------------------------------------
+// Doghe da 45 x 9 cm (lunghezza 5 volte la larghezza), disegnate in diritto: orizzontali e verticali alternate, la
+// spina corre in diagonale. Il pavimento (room.js) ruota le coordinate di 45 gradi, cosi' la spina corre verso la
+// vetrata. Le doghe stanno su un reticolo: ogni coppia (orizzontale + verticale) sale di (W, W) e la fila accanto e'
+// spostata di (L, -L); il disegno si ripete ogni 2L in x e in y. La tela copre due ripetizioni per lato (1,8 m,
+// 80 doghe diverse) e ogni doga prende tono e venature dalla sua posizione nel reticolo ridotta alla tela: una doga
+// tagliata dal bordo continua uguale dall'altra parte, niente cuciture.
+// Restituisce il colore (map) e il rilievo (relief, lineare): rosso = altezza, con le fughe in basso (bumpMap);
+// verde = ruvidezza, vernice satinata e fughe opache (roughnessMap).
+export const PARQUET = { ratio: 5, size: 1.8 };   // lunghezza/larghezza della doga; metri coperti dalla tela
+export function parquetTextures(seed = 11) {
+  const S = 1024, N = PARQUET.ratio, W = S / (4 * N), L = W * N;
+  const c = canvas(S, S), g = c.getContext("2d");
+  const rc = canvas(S, S), rg = rc.getContext("2d");
+  g.fillStyle = "#2a1a0e"; g.fillRect(0, 0, S, S);           // il fondo delle fughe
+  rg.fillStyle = "rgb(0,235,0)"; rg.fillRect(0, 0, S, S);
+  const mod = (a, m) => ((a % m) + m) % m;
+  // posizione nel reticolo ridotta alla tela: (i, j) equivale a (i + 2N, j + 2) e a (i + 4N, j)
+  const key = (i, j) => { const jm = mod(j, 2); return mod(i - N * (j - jm), 4 * N) * 2 + jm; };
+
+  function plank(x, y, w, h, horiz, r) {
+    if (x > S || y > S || x + w < 0 || y + h < 0) return;
+    const len = horiz ? w : h, wid = horiz ? h : w;
+    const tone = 0.8 + r() * 0.34, warm = (r() - 0.5) * 18;
+    g.fillStyle = `rgb(${150 * tone + warm},${107 * tone + warm * 0.4},${66 * tone - warm * 0.3})`;
+    g.fillRect(x, y, w, h);
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    // la doga cambia un poco di tono da un capo all'altro
+    const gr = horiz ? g.createLinearGradient(x, 0, x + w, 0) : g.createLinearGradient(0, y, 0, y + h);
+    gr.addColorStop(0, `rgba(70,40,18,${r() * 0.16})`); gr.addColorStop(0.5, "rgba(70,40,18,0)"); gr.addColorStop(1, `rgba(255,228,186,${r() * 0.1})`);
+    g.fillStyle = gr; g.fillRect(x, y, w, h);
+    // venature lungo la doga
+    const at = (t, s) => (horiz ? [x + t, y + s] : [x + s, y + t]);
+    const lines = 9 + ((r() * 7) | 0);
+    for (let k = 0; k < lines; k++) {
+      const off = ((k + r()) / lines) * wid, amp = 0.4 + r() * 1.6, f = ((1 + r() * 3) * Math.PI * 2) / len, ph = r() * 6.28, drift = (r() - 0.5) * 6;
+      const dark = r() < 0.72;
+      g.strokeStyle = dark ? `rgba(66,36,14,${0.08 + r() * 0.2})` : `rgba(214,170,116,${0.05 + r() * 0.1})`;
+      g.lineWidth = 0.5 + r() * 1.3;
+      g.beginPath();
+      for (let t = -4; t <= len + 4; t += 6) {
+        const [px, py] = at(t, off + Math.sin(t * f + ph) * amp + drift * (t / len));
+        t < 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+      }
+      g.stroke();
+    }
+    // in qualche doga la "fiamma": archi uno dentro l'altro
+    if (r() < 0.35) {
+      const ct = len * (0.3 + r() * 0.4), cs = wid * (0.35 + r() * 0.3), dir = r() < 0.5 ? 0 : Math.PI;
+      const [cx, cy] = at(ct, cs);
+      for (let m = 0; m < 6; m++) {
+        g.strokeStyle = `rgba(66,36,14,${0.2 - m * 0.025})`; g.lineWidth = 0.9;
+        const a = len * (0.06 + m * 0.045), b = wid * (0.08 + m * 0.07);
+        g.beginPath(); g.ellipse(cx, cy, horiz ? a : b, horiz ? b : a, 0, (horiz ? 0 : Math.PI / 2) + dir - Math.PI / 2, (horiz ? 0 : Math.PI / 2) + dir + Math.PI / 2); g.stroke();
+      }
+    }
+    g.restore();
+    // spigoli smussati: un filo di luce su un lato, la fuga scura tutt'intorno
+    g.strokeStyle = "rgba(255,226,184,.09)"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x + 2, y + h - 2); g.lineTo(x + 2, y + 2); g.lineTo(x + w - 2, y + 2); g.stroke();
+    g.strokeStyle = "rgba(30,17,8,.6)"; g.lineWidth = 0.9; g.strokeRect(x + 0.45, y + 0.45, w - 0.9, h - 0.9);
+    // rilievo: piano alto e satinato, bordo che scende nella fuga
+    rg.fillStyle = `rgb(255,${100 + r() * 34},0)`; rg.fillRect(x, y, w, h);
+    for (let k = 0; k < 3; k++) {   // qualche riga d'uso piu' lucida
+      rg.strokeStyle = `rgba(255,70,0,${0.2 + r() * 0.3})`; rg.lineWidth = 0.6 + r();
+      const t0 = r() * len, s0 = r() * wid, l = 10 + r() * 40, a = (r() - 0.5) * 0.5;
+      const [px, py] = at(t0, s0), [qx, qy] = at(t0 + Math.cos(a) * l, s0 + Math.sin(a) * l);
+      rg.beginPath(); rg.moveTo(px, py); rg.lineTo(qx, qy); rg.stroke();
+    }
+    rg.strokeStyle = "rgb(150,190,0)"; rg.lineWidth = 2.4; rg.strokeRect(x + 1.2, y + 1.2, w - 2.4, h - 2.4);
+    rg.strokeStyle = "rgb(40,235,0)"; rg.lineWidth = 0.9; rg.strokeRect(x + 0.45, y + 0.45, w - 0.9, h - 0.9);
+  }
+
+  for (let j = -8; j <= 8; j++) for (let i = -60; i <= 100; i++) {
+    const ox = i * W + j * L, oy = i * W - j * L;
+    plank(ox, oy, L, W, true, rng(seed * 977 + key(i, j) * 7919));
+    plank(ox + L, oy + W - L, W, L, false, rng(seed * 977 + key(i, j) * 7919 + 3301));
+  }
+  // grana fine
+  const img = g.getImageData(0, 0, S, S), d = img.data, r = rng(seed + 5);
+  for (let i = 0; i < d.length; i += 4) { const k = (r() - 0.5) * 9; d[i] += k; d[i + 1] += k * 0.8; d[i + 2] += k * 0.6; }
+  g.putImageData(img, 0, 0);
+  return { map: tex(c, { repeat: [1, 1] }), relief: tex(rc, { srgb: false, repeat: [1, 1] }) };
+}
+
 // --- intonaco scuro -------------------------------------------------------
 export function plasterTextures(seed = 3) {
   const S = 512, c = canvas(S, S), g = c.getContext("2d"), n = fbmField(seed, 5), r = rng(seed);

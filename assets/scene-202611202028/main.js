@@ -51,7 +51,10 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 export async function start({ data, root, force, trusted, toLofi }) {
   const ui = new UI(root, data);
-  ui.progress(0.3);
+  // Barra di caricamento: ogni fase ha un tratto grande quanto il tempo che ci mette di solito. Su un PC con grafica
+  // integrata (2026): moduli 0,5 s (molto di piu' su una rete lenta; fino al 13% la anima site.js), costruzione della
+  // scena 0,7 s (fino al 27%), shader 3,5 s (fino all'80%), primo fotogramma 0,3 s, misura della fluidita' 1 s.
+  ui.progress(0.15);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const debug = new URLSearchParams(location.search).has("debug");
 
@@ -86,28 +89,29 @@ export async function start({ data, root, force, trusted, toLofi }) {
     document.fonts.load('800 60px "Archivo Variable"'),
     document.fonts.load('600 30px "Archivo Variable"'),
   ]).catch(() => {});
-  ui.progress(0.38);
+  ui.progress(0.16);
   await nextFrame();
 
   // --- scena ---
   const ctx = { ui: data.ui, data, renderer };
   const room = createRoom(ctx);
   scene.add(room.group);
-  ui.progress(0.55);
+  ui.progress(0.18);
   await nextFrame();
   const desk = createDesk();
   scene.add(desk.group);
   const lamp = createLamp();
   scene.add(lamp.group);
-  ui.progress(0.6);
+  ui.progress(0.21);
   await nextFrame();
-  const objects = await createObjects(ctx, desk.woodMap, (f) => ui.progress(0.6 + f * 0.3));
+  const objects = await createObjects(ctx, desk.woodMap, (f) => ui.progress(0.21 + f * 0.03));
   scene.add(objects.group);
   const extras = createExtras(data);
   scene.add(extras.group);
   mergeStatic(desk.group);
   mergeStatic(room.group);
   mergeStatic(lamp.group);
+  ui.progress(0.25);
   await nextFrame();
 
   // --- post-processing ---
@@ -146,7 +150,7 @@ export async function start({ data, root, force, trusted, toLofi }) {
     bloom.strength = L(0.72, 0.25, k);
     bloom.threshold = L(1.35, 2.2, k);
     finish.uniforms.uVig.value = L(0.5, 0.86, k);
-    lamp.spot.intensity = L(1.7, 1.0, k);
+    lamp.spot.intensity = L(1.7, 1.0, k) * lamp.power;
     scene.background.lerpColors(BG_NIGHT, BG_DAY, k);
     // "dal vivo": anche le scritte sopra la scena passano al chiaro quando fuori e' giorno
     if (themeMode() === "live") { if (k > 0.5) html.dataset.theme = "light"; else delete html.dataset.theme; }
@@ -244,6 +248,7 @@ export async function start({ data, root, force, trusted, toLofi }) {
   addHit(extras.headphones, "sound"); // non e' una sezione: la cuffia accende e spegne il suono
   addHit(extras.laser, "laser");      // i pezzi tagliati al laser: la scheda del taglio laser
   addHit(extras.handheld, "game");    // la console portatile: la scheda Videogames
+  addHit(room.poster.userData.board, "catalog");     // il poster della parete sinistra: il catalogo delle macchine sonore, in una nuova scheda
   for (const s of objects.synths) addHit(s.group, "shop", s.product.slug);
 
   // --- etichette sempre visibili sugli oggetti: link veri, solo nella vista d'insieme ---
@@ -426,6 +431,7 @@ export async function start({ data, root, force, trusted, toLofi }) {
     if (!hit) { if (state.view !== "overview") back(); return; }
     const { view, slug } = hit.userData;
     if (view === "sound") { setSound(!audio.enabled); return; }
+    if (view === "catalog") { window.open(data.catalog, "_blank", "noopener"); return; }
     if (slug) {
       ui.selected = slug;
       if (state.view === "shop") pick(slug);
@@ -460,13 +466,13 @@ export async function start({ data, root, force, trusted, toLofi }) {
     const x = (tmp.x + 1) / 2 * size.x, y = (1 - tmp.y) / 2 * size.y;
     if (slug && state.view === "shop") ui.showLabel(x, y, products[slug].name, products[slug].status_label);
     else if (view === "sound") ui.showLabel(x, y, audio.enabled ? data.ui.sound_on : data.ui.sound_off, audio.enabled ? data.ui.sound_hint_off : data.ui.sound_hint_on);
+    else if (view === "catalog") ui.showLabel(x, y, data.ui.catalog_name, data.ui.catalog_hint);
     else ui.hideLabel(); // per le sezioni ci sono gia' le etichette fisse
   }
 
   resize();
   new ResizeObserver(resize).observe(holder);
-  renderer.compile(scene, camera);
-  ui.progress(0.95);
+  ui.progress(0.27);
   await nextFrame();
 
   // --- loop ---
@@ -527,8 +533,12 @@ export async function start({ data, root, force, trusted, toLofi }) {
   // stesso, ma non si torna indietro. adapt() non alza mai la risoluzione, quindi non contrasta questi gradini.
   // Solo per le prove (?debug&quality=N): applica i gradini fino a N e apre la scena in ogni caso.
   const MIN_FPS = 24;
+  // la barra scorre mentre si misura: la prima misura la porta quasi in fondo, le altre (qualita' ridotta) di meno
+  let barAt = 0.84;
   async function measureSecond() {
     for (let i = 0; i < 3; i++) await nextFrame(); // riscaldamento (upload texture)
+    barAt += (0.99 - barAt) * 0.8;
+    ui.progress(barAt, 1000);
     const t0 = performance.now(); let n = 0;
     while (performance.now() - t0 < 1000) { await nextFrame(); n++; }
     return n / ((performance.now() - t0) / 1000);
@@ -561,10 +571,31 @@ export async function start({ data, root, force, trusted, toLofi }) {
   }
   const software = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(gpu);
 
+  // Compila gli shader della scena; la barra intanto va da `from` verso `to` e ci arriva quando sono pronti.
+  // Three sceglie la variante di uno shader anche in base a dove si disegna: sulla tela applica tone mapping e sRGB,
+  // in un render target (il composer) no, perche' li applica l'OutputPass alla fine. Compilati senza il render target
+  // del composer erano la variante sbagliata: il primo fotogramma li rifaceva tutti da capo, bloccando la pagina per
+  // secondi con la barra gia' piena. Il render target serve solo alla parte sincrona di compileAsync (renderer.compile).
+  // Contare i programmi pronti non dice a che punto si e': quasi tutti lo sono in un decimo di secondo, poi si aspetta
+  // il vetro della finestra (room.js, lo shader procedurale del panorama: da solo circa 3 secondi con Direct3D) e il
+  // driver non dice quanto manca. Allora la barra va col tempo: ogni 3 secondi copre, a velocita' costante, l'85%
+  // di quel che resta della fase, cosi' rallenta ma non si ferma e non arriva in fondo da sola.
+  async function compileShaders(from, to) {
+    renderer.setRenderTarget(composer.readBuffer);
+    const done = renderer.compileAsync(scene, camera);
+    renderer.setRenderTarget(null);
+    let at = from, timer = 0;
+    const step = () => { at += (to - at) * 0.85; ui.progress(at, 3000); timer = setTimeout(step, 3000); };
+    step();
+    await done;
+    clearTimeout(timer);
+    ui.progress(to);
+  }
+
   // gli shader si compilano prima di misurare, cosi' la loro compilazione non conta come lentezza della scena
-  if (renderer.compileAsync) await renderer.compileAsync(scene, camera).catch(() => {});
+  await compileShaders(0.27, 0.8);
+  ui.progress(0.84, 400); // il primo fotogramma prepara ancora ombre e post-processing: la barra intanto scorre
   run(true);
-  ui.progress(1);
   let quality = 0;
   const forcedQ = debug ? Math.min(+new URLSearchParams(location.search).get("quality") || 0, STEPS.length) : 0;
   for (let i = 0; i < forcedQ; i++) if (STEPS[i]()) quality = i + 1;

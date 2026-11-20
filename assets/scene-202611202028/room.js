@@ -1,6 +1,6 @@
 // Stanza: pareti scure e vetrata panoramica sul Mar Grande con pioggia sul vetro.
 import * as THREE from "three";
-import { plasterTextures, canvas, tex, FONT } from "./textures.js";
+import { plasterTextures, parquetTextures, PARQUET, canvas, tex, FONT } from "./textures.js";
 import { PATCH, heavens } from "./sky.js";
 
 export const ROOM = {
@@ -110,7 +110,14 @@ function posterWall(frameMat, glowMat) {
   const spill = new THREE.Mesh(new THREE.PlaneGeometry(W * 2.3, H * 1.9), new THREE.MeshBasicMaterial({ map: tex(gc, { mips: false }), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.22 }));
   spill.position.z = 0.0015;
   spill.renderOrder = 1;
-  g.add(spill, frame, sheet, light);
+  // board: il poster vero e proprio (cornice, carta, filo di luce), senza l'alone sul muro: e' lui che si clicca e
+  // che si contorna al passaggio del mouse (main.js); con l'alone il contorno disegnava un rettangolo largo il doppio
+  const board = new THREE.Group();
+  board.name = "poster-board";
+  board.userData.dynamic = true;   // mergeStatic non lo unisce al resto della stanza: deve restare intero per contorno e clic
+  board.add(frame, sheet, light);
+  g.add(spill, board);
+  g.userData.board = board;
   g.userData.material = material;
   g.userData.spill = spill.material;
   return g;
@@ -1043,8 +1050,8 @@ export function createGlass() {
 // Serve solo alla luce del sole sulle facciate; il cielo della vetrata (stelle, Luna) segue FACING in sky.js.
 const CITY_BEARING = 45;
 const C3 = (hex) => new THREE.Color(hex);
-const NIGHT = { moon: C3(0x5f86d8), sky: C3(0x2c3466), ground: C3(0x0b0710), floor: C3(0x17130f), ceil: C3(0x1d2026) };
-const DAY = { moon: C3(0xfff3e2), sky: C3(0xd5dee8), ground: C3(0x8f887b), floor: C3(0x6b6156), ceil: C3(0xc4c9cc) };
+const NIGHT = { moon: C3(0x5f86d8), sky: C3(0x2c3466), ground: C3(0x0b0710), floor: C3(0x31261f), ceil: C3(0x1d2026) };
+const DAY = { moon: C3(0xfff3e2), sky: C3(0xd5dee8), ground: C3(0x8f887b), floor: C3(0xd9d0c6), ceil: C3(0xc4c9cc) };
 const DUSK = C3(0xff9a52); // luce radente di alba e tramonto
 
 export function createRoom(ctx) {
@@ -1081,12 +1088,29 @@ export function createRoom(ctx) {
   leftWall.position.set(left, height / 2, wallZ + DEPTH / 2);
   group.add(leftWall);
 
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.8 });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.2, DEPTH), floorMat);
+  // parquet di rovere a spina di pesce (textures.js). Le coordinate della texture sono in metri e ruotate di 45
+  // gradi sulla geometria (non con texture.rotation, che sul piano 3,2 x 4,1 deformerebbe le doghe): la spina corre
+  // verso la vetrata. Il colore del materiale fa da tinta: scuro di notte, quasi neutro di giorno (setSky).
+  const parquet = parquetTextures();
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: NIGHT.floor, map: parquet.map, bumpMap: parquet.relief, bumpScale: 0.9, roughnessMap: parquet.relief, roughness: 1,
+  });
+  const floorGeo = new THREE.PlaneGeometry(3.2, DEPTH), fp = floorGeo.attributes.position, fuv = floorGeo.attributes.uv;
+  for (let i = 0; i < fuv.count; i++) {
+    const x = fp.getX(i) / PARQUET.size, y = fp.getY(i) / PARQUET.size;
+    fuv.setXY(i, (x - y) * Math.SQRT1_2, (x + y) * Math.SQRT1_2);
+  }
+  const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set((left + right) / 2, 0, wallZ + DEPTH / 2);
   floor.receiveShadow = true;
   group.add(floor);
+  // battiscopa scuro lungo le tre pareti: chiude il pavimento contro l'intonaco
+  const skirtMat = new THREE.MeshStandardMaterial({ color: 0x16181b, roughness: 0.55 });
+  const skirt = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.07, d), skirtMat); m.position.set(x, 0.035, z); m.receiveShadow = true; group.add(m); };
+  skirt(right - left, 0.014, (left + right) / 2, wallZ + 0.007);
+  skirt(0.014, DEPTH, left + 0.007, wallZ + DEPTH / 2);
+  skirt(0.014, DEPTH, right - 0.007, wallZ + DEPTH / 2);
   const ceilMat = new THREE.MeshStandardMaterial({ color: 0x1d2026, roughness: 1 });
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.2, DEPTH), ceilMat);
   ceil.rotation.x = Math.PI / 2;
@@ -1254,6 +1278,7 @@ void main() {
   return {
     group,
     glass,
+    poster,   // si clicca: apre il catalogo delle macchine sonore (main.js)
     // day: 0 = notte, 1 = giorno (di giorno entra luce chiara dalla vetrata e le pareti schiariscono).
     // rain: 0 vetro asciutto .. 1 pioggia. cloud: 0 sereno .. 1 coperto. warm: 0..1, alba e tramonto.
     // Tema scuro = { day 0, rain 1, cloud 0.66 }, tema chiaro = { day 1, rain 1, cloud 1 }: sono i due aspetti di sempre.

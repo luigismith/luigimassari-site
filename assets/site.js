@@ -165,8 +165,15 @@
       if (api) { api.resume(); return; }
       if (loading) return;
       root.classList.add("is-intro");
+      // Mentre arrivano i moduli della scena (circa 2,5 MB, di cui il browser non dice l'avanzamento) la barra parte
+      // e scorre piano verso il 13%; da li' la riprende ui.js con i valori veri. Qui serve un'animazione (Web
+      // Animations) e non una transizione CSS: appena aperta la pagina Chrome non fa partire la transizione e la
+      // barra salterebbe subito al 13%.
       var bar = root.querySelector("[data-scene-bar]");
-      if (bar) bar.style.width = "8%";
+      if (bar && bar.animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        bar.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(0.13)" }],
+          { id: "lm-lead", duration: 6000, easing: "cubic-bezier(.15,.6,.3,1)", fill: "forwards" });
+      } else if (bar) bar.style.transform = "scaleX(0.08)";
       loading = import(data.base + "main.js").then(function (mod) {
         // trusted: il visitatore ha scelto lui la scena ("Entra nel 3D"), quindi non si torna da soli alla classica
         return mod.start({ data: data, root: root, force: force, trusted: getPref() === "3d", toLofi: toLofi });
@@ -182,7 +189,10 @@
       enterBtn.hidden = false;
       enterBtn.addEventListener("click", function () { setPref("3d"); to3D(); });
     }
-    if (ok && (getPref() !== "lofi" || force)) to3D();
+    // ?lofi (per esempio /?lofi#open-source dai link al blocco Open): questa volta la pagina classica, senza
+    // salvare la scelta; il pulsante "Entra nel laboratorio 3D" resta disponibile
+    var once = params.has("lofi");
+    if (ok && !once && (getPref() !== "lofi" || force)) to3D();
   })();
 
   // Scheda prodotto: un clic su una miniatura la porta nel riquadro grande. Senza JavaScript la miniatura
@@ -366,6 +376,10 @@
         cards.forEach(function (c) { c.hidden = !!f && (f === "open" ? !("open" in c.dataset) : c.dataset.cat !== f); });
       });
     });
+    // ?filter=open (o un'area) dai link esterni alla pagina: il filtro parte gia' scelto
+    var start = new URLSearchParams(location.search).get("filter");
+    var startBtn = start && buttons.filter(function (b) { return b.dataset.filter === start; })[0];
+    if (startBtn) startBtn.click();
     root.querySelectorAll("a[data-work]").forEach(function (a) {
       a.addEventListener("click", function (e) {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
