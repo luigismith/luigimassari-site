@@ -136,7 +136,7 @@
     function eligible() {
       if (!hasWebGL2()) return false;
       if (force) return true;
-      return window.innerWidth >= 820 && (navigator.hardwareConcurrency || 4) >= 4;
+      return window.innerWidth >= 820 && (navigator.hardwareConcurrency || 4) >= 2;
     }
     function setLofiInert(on) {
       lofiEls.forEach(function (el) { if (el) { if (on) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
@@ -168,7 +168,8 @@
       var bar = root.querySelector("[data-scene-bar]");
       if (bar) bar.style.width = "8%";
       loading = import(data.base + "main.js").then(function (mod) {
-        return mod.start({ data: data, root: root, force: force, toLofi: toLofi });
+        // trusted: il visitatore ha scelto lui la scena ("Entra nel 3D"), quindi non si torna da soli alla classica
+        return mod.start({ data: data, root: root, force: force, trusted: getPref() === "3d", toLofi: toLofi });
       }).then(function (a) { api = a; }).catch(function (err) {
         console.error("Scena 3D non disponibile:", err);
         loading = null;

@@ -49,7 +49,7 @@ const FinishShader = {
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-export async function start({ data, root, force, toLofi }) {
+export async function start({ data, root, force, trusted, toLofi }) {
   const ui = new UI(root, data);
   ui.progress(0.3);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -128,6 +128,8 @@ export async function start({ data, root, force, toLofi }) {
   const finish = new ShaderPass(FinishShader);
   composer.addPass(finish);
 
+  let direct = false; // vero dal passo 3 della qualita': si disegna dritto sulla tela, senza composer (vedi STEPS)
+
   // --- tema: scuro = notte (la luce di sempre), chiaro = giorno coperto, "dal vivo" = sole e meteo veri ---
   // Un "aspetto" e' { day, rain, cloud, warm } (vedi room.setSky). I due temi fissi sono due aspetti costanti;
   // nella modalita' "dal vivo" l'aspetto arriva da live.js, che calcola il sole e legge il meteo.
@@ -203,8 +205,7 @@ export async function start({ data, root, force, toLofi }) {
     const w = holder.clientWidth || window.innerWidth, h = holder.clientHeight || window.innerHeight;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
-    composer.setPixelRatio(dpr);
-    composer.setSize(w, h);
+    if (!direct) { composer.setPixelRatio(dpr); composer.setSize(w, h); }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     rig.setSize(w, h);
@@ -404,14 +405,25 @@ export async function start({ data, root, force, toLofi }) {
   canvas.addEventListener("pointercancel", endDrag);
   canvas.addEventListener("lostpointercapture", endDrag);
   canvas.addEventListener("wheel", (e) => { if (!state.entered) return; e.preventDefault(); rig.zoomBy(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: false });
-  canvas.addEventListener("dblclick", () => { if (!state.hover) rig.resetOrbit(); });   // doppio clic nel vuoto: l'inquadratura torna a posto
+  // doppio clic nel vuoto sulla vista d'insieme: l'inquadratura torna a posto (in una sezione il primo clic riporta gia' qui)
+  canvas.addEventListener("dblclick", () => { if (!state.hover && state.view === "overview" && !rig.moving) rig.resetOrbit(); });
   canvas.addEventListener("pointerup", (e) => {
     const wasDrag = dragging;
     endDrag();
     if (wasDrag || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) { downAt = null; return; }
     downAt = null;
-    const hit = state.hover;
-    if (!hit || !state.entered) return;
+    if (!state.entered) return;
+    // l'oggetto sotto il dito o il mouse si cerca anche qui: con il tocco l'hover non arriva prima del clic
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    let hit = state.hover || ray.intersectObjects(hits, false)[0]?.object || null;
+    // dentro una sezione il suo oggetto conta per com'e' davvero, non per la scatola che lo contiene: da vicino la
+    // scatola copre anche il vuoto attorno (la stampante arriva fino alla finestra)
+    if (hit && state.view !== "overview" && hit.userData.view === state.view && !hit.userData.slug &&
+        !ray.intersectObject(hit.userData.obj, true).length) hit = null;
+    // clic nel vuoto dentro una sezione: si torna alla vista d'insieme, come con Esc
+    if (!hit) { if (state.view !== "overview") back(); return; }
     const { view, slug } = hit.userData;
     if (view === "sound") { setSound(!audio.enabled); return; }
     if (slug) {
@@ -478,7 +490,7 @@ export async function start({ data, root, force, toLofi }) {
     updateHover();
     updateTags();
     finish.uniforms.uTime.value = t;
-    composer.render(dt);
+    if (direct) renderer.render(scene, camera); else composer.render(dt);
     fps.frames++; fps.acc += dt;
     if (fps.acc >= 0.5) {
       fps.value = fps.frames / fps.acc;
@@ -507,36 +519,89 @@ export async function start({ data, root, force, toLofi }) {
     if (visible) live.resume(); else live.pause();
   });
 
-  // primo secondo di render: sotto i 30 fps si passa da soli alla versione Lo-Fi
-  async function measureFirstSecond() {
-    for (let i = 0; i < 3; i++) await nextFrame(); // riscaldamento (shader, upload texture)
+  // Prima di aprire la scena si misura quanto e' fluida, un secondo alla volta. Un tetto di 30 fps va bene: lo mettono
+  // il risparmio energetico di Chrome ed Edge (sui portatili a batteria si accende da solo), il Desktop remoto e certi
+  // schermi, quindi la soglia sta sotto, a 24. Se la scena non ci arriva si abbassa la qualita' a gradini, dal meno
+  // visibile al piu' pesante, e si misura di nuovo; solo se non basta neanche la qualita' piu' bassa si apre la versione
+  // classica. Se il visitatore ha scelto lui la scena (pulsante "Entra nel 3D", trusted) la qualita' si abbassa lo
+  // stesso, ma non si torna indietro. adapt() non alza mai la risoluzione, quindi non contrasta questi gradini.
+  // Solo per le prove (?debug&quality=N): applica i gradini fino a N e apre la scena in ogni caso.
+  const MIN_FPS = 24;
+  async function measureSecond() {
+    for (let i = 0; i < 3; i++) await nextFrame(); // riscaldamento (upload texture)
     const t0 = performance.now(); let n = 0;
     while (performance.now() - t0 < 1000) { await nextFrame(); n++; }
     return n / ((performance.now() - t0) / 1000);
   }
+  const lowerDpr = (to) => () => { if (dpr <= to) return false; dpr = to; resize(); return true; };
+  const STEPS = [
+    lowerDpr(1),                                                              // 1: risoluzione 1x anche sugli schermi densi
+    () => {                                                                   // 2: niente bagliore e niente MSAA
+      bloom.enabled = false;
+      for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.dispose(); }
+      return true;
+    },
+    () => {                                                                   // 3: niente composer: si disegna dritto sulla tela
+      // tone mapping e sRGB li applica direttamente il renderer sul framebuffer; si perdono bagliore, vignettatura,
+      // grana e contorno al passaggio del mouse (outline.enabled resta innocuo: nessuno lo legge piu')
+      direct = true;
+      for (const p of composer.passes) p.dispose();
+      composer.renderTarget1.dispose(); composer.renderTarget2.dispose();
+      return true;
+    },
+    lowerDpr(0.75),                                                           // 4: tre quarti della risoluzione (la tela riempie comunque la finestra via CSS)
+    lowerDpr(0.6),                                                            // 5: poco piu' della meta'
+  ];
+  // GPU vera o rendering software (accelerazione hardware spenta): Chrome nasconde il nome dietro "WebKit WebGL"
+  const gl = renderer.getContext();
+  let gpu = String(gl.getParameter(gl.RENDERER));
+  if (/^webkit webgl$/i.test(gpu)) {
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    if (info) gpu = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
+  }
+  const software = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(gpu);
 
+  // gli shader si compilano prima di misurare, cosi' la loro compilazione non conta come lentezza della scena
+  if (renderer.compileAsync) await renderer.compileAsync(scene, camera).catch(() => {});
   run(true);
   ui.progress(1);
-  // sotto i 30 fps nel primo secondo si passa alla versione classica; un singhiozzo iniziale
-  // (shader, texture, GPU occupata) non basta: si conferma con un secondo in piu'
-  let firstFps = await measureFirstSecond();
-  if (firstFps < 30 && !force) firstFps = Math.max(firstFps, await measureFirstSecond());
+  let quality = 0;
+  const forcedQ = debug ? Math.min(+new URLSearchParams(location.search).get("quality") || 0, STEPS.length) : 0;
+  for (let i = 0; i < forcedQ; i++) if (STEPS[i]()) quality = i + 1;
+  let firstFps = await measureSecond();
+  if (!force && !forcedQ) {
+    // un singhiozzo iniziale (texture, GPU occupata da altro) non basta: si riprova una volta alla stessa qualita'
+    if (firstFps < MIN_FPS) firstFps = Math.max(firstFps, await measureSecond());
+    for (let i = 0; i < STEPS.length && firstFps < MIN_FPS; i++) {
+      if (STEPS[i]()) { quality = i + 1; firstFps = await measureSecond(); }
+    }
+  }
+  const slow = firstFps < MIN_FPS && !force && !trusted && !forcedQ;
+  console.info(`Scena 3D: ${Math.round(firstFps)} fps, qualità ${quality === 0 ? "piena" : "ridotta (" + quality + ")"}, GPU ${gpu}` + (slow ? ": si apre la versione classica" : ""));
+  let readyLater = false;
   const api = {
     pause() { run(false); audio.setVisible(false); live.pause(); },
     resume() {
       run(true); audio.setVisible(true);
       if (themeDirty) { themeDirty = false; setTheme(themeMode()); } else live.resume(); // tema cambiato dalla versione classica
+      if (readyLater) { readyLater = false; enterScene(); }
     },
     get fps() { return fps.value; },
     firstFps,
+    get quality() { return quality; },
   };
-  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio, refreshShadows, live, get look() { return look; } };
-  if (firstFps < 30 && !force) {
+  if (debug) window.__banco = { api, renderer, scene, camera, rig, VIEWS, fps, composer, objects, state, audio, refreshShadows, live, get quality() { return quality; }, gpu, get look() { return look; } };
+  if (slow) {
+    // la scena resta pronta in memoria: se il visitatore torna al 3D dalla versione classica, riparte da qui
     run(false);
-    toLofi({ auto: true, message: data.ui.too_slow });
+    readyLater = true;
+    toLofi({ auto: true, message: software ? data.ui.no_gpu : data.ui.too_slow });
     return api;
   }
-  ui.ready(({ sound, auto }) => {
+  enterScene();
+  return api;
+
+  function enterScene() { ui.ready(({ sound, auto }) => {
     state.entered = true;
     if (auto && sound) {
       // senza un gesto il browser non lascia partire l'audio: il suono resta scelto e parte al primo tocco o tasto
@@ -555,6 +620,5 @@ export async function start({ data, root, force, toLofi }) {
     const v = hashView();
     if (v !== "overview") goTo(v);
     else root.focus({ preventScroll: true });
-  });
-  return api;
+  }); }
 }
