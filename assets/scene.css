@@ -158,6 +158,9 @@ html.scene-mode body > .site-footer { visibility: hidden; }
 
 /* Controlli in basso */
 .scene-controls { position: absolute; right: 20px; bottom: 18px; display: flex; gap: 8px; }
+/* i dati del panorama vero (OpenStreetMap, ODbL; Overture Maps): una riga piccola in basso a sinistra, come sulle mappe */
+.scene-credit { position: absolute; left: 20px; bottom: 22px; margin: 0; font-size: 11.5px; color: var(--sc-muted); z-index: 3; }
+.scene-credit a { color: inherit; }
 .scene-ctl {
   display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px;
   font: inherit; font-size: 14px; font-weight: 650; font-stretch: 90%;

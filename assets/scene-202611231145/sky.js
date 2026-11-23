@@ -4,11 +4,11 @@
 const RAD = Math.PI / 180;
 const norm = (deg) => ((deg % 360) + 360) % 360;
 
-// La vetrata guarda a sud: l'azimut 0 della scena corrisponde a questa direzione (gradi da nord verso est).
-// Con 187 gradi il canale navigabile, che nel panorama sta nel riquadro di destra (AZB = 0,165 rad in room.js, cioe'
-// 37,8 gradi veri perche' il cielo e' compresso di WIDE), cade a sud-ovest, a 225 gradi: come lo si vede dal Mar Piccolo.
-// Se si sposta AZB in room.js, FACING = 225 - AZB * WIDE * 180 / pi.
-export const FACING = 187;
+// La vetrata guarda quasi a nord: dal Mar Grande, sull'asse del Canale navigabile, verso il Mar Piccolo (il panorama
+// vero di Taranto, tools/panorama.py). L'azimut 0 della scena corrisponde a questa direzione (gradi da nord verso est).
+// A nord la Luna dalla vetrata si vede di rado: e' il cielo vero di quel punto.
+import { PANO } from "./taranto/pano.js";
+export const FACING = PANO.BEARING;
 // Dalla vetrata si vede solo una fascia bassa di cielo: per farci stare la Luna e le stelle il cielo vero è
 // mostrato in grandangolo, compresso di questo fattore in azimut e in altezza. Direzioni, ore e fasi sono vere;
 // le distanze sullo schermo sono un quarto di quelle reali. Dalla vista d'insieme si vede la parte bassa

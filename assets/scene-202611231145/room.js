@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { plasterTextures, parquetTextures, PARQUET, canvas, tex, FONT } from "./textures.js";
 import { PATCH, heavens } from "./sky.js";
+import { PANO } from "./taranto/pano.js";
 
 export const ROOM = {
   wallZ: -0.5, left: -1.6, right: 1.3, height: 2.7,
@@ -198,183 +199,65 @@ vec3 lightCol(float sd, out float boost) {
   return SODIUM;
 }
 
-float coast(float az) {
-  float n = fbm3(vec2(az * 2.6 + 3.0, 0.5));
-  float d = vnoise(vec2(az * 22.0, 7.0));
-  return HOR + 0.016 + 0.075 * n * n + 0.004 * d;
-}
+// --- Il panorama vero di Taranto, calcolato da tools/panorama.py dai dati di OpenStreetMap, Overture e del terreno ---
+// Il punto di vista e' sul Mar Grande, sull'asse del Canale navigabile, a 800 m dall'imbocco, verso il Mar Piccolo.
+// Per ogni direzione (azimut az, elevazione el) le tre immagini dicono che cosa c'e' e a che distanza:
+// uPano (nearest): classe*16 + angolo della facciata, distanza (log), numero dell'edificio, quota del tetto (m/2);
+// uLuci (lineare, con mipmap): luci della notte (rgb) e copertura della sagoma (a); uStrade (nearest): riga 0 la base
+// della riva (per i riflessi), righe 1-3 le strade lungo l'acqua e sui ponti, dove passano le auto.
+uniform sampler2D uPano;
+uniform sampler2D uLuci;
+uniform sampler2D uStrade;
+const float PAZ0 = ${PANO.AZ0.toFixed(5)}, PAZ1 = ${PANO.AZ1.toFixed(5)}, PEL0 = ${PANO.EL0.toFixed(5)}, PEL1 = ${PANO.EL1.toFixed(5)};
+const float PK = ${PANO.K.toFixed(3)}, PHV = ${PANO.HV.toFixed(2)};
+const float LDMIN = ${Math.log(PANO.DMIN).toFixed(6)}, LDR = ${Math.log(PANO.DMAX / PANO.DMIN).toFixed(6)};
+const float C_HILL = 1.0, C_GROUND = 2.0, C_QUAY = 3.0, C_STONE = 4.0, C_OLD = 5.0, C_RES = 6.0, C_TALL = 7.0, C_IND = 8.0;
+const float C_CHIMNEY = 9.0, C_STEEL = 10.0, C_PALAZZO = 11.0, C_CHURCH = 12.0, C_GREEN = 13.0, C_DARK = 14.0, C_TANK = 15.0;
+const float PI = 3.14159265;
+const vec3 SAND = vec3(0.47, 0.32, 0.17);   // pietra calcarea (colori lineari: a schermo escono piu' chiari)
 
-// --- Taranto: il canale navigabile visto dal Mar Grande, verso il Mar Piccolo -------------------------------
-// u = distanza dal centro del canale in mezze larghezze: |u| < 1 e' acqua; in fondo, oltre il ponte, la riva bassa
-// del Mar Piccolo. A sinistra il castello aragonese (la torre tonda sul canale, dietro i corpi di fabbrica con il
-// tetto a falde, davanti la scarpa delle mura); a destra il borgo: il muraglione sull'acqua con il sottopasso, sopra
-// il palazzo rosa e le case basse, dietro i palazzoni moderni a fasce di balconi. Quote in radianti sopra l'acqua.
-const float AZB = 0.165;           // azimut del centro del canale: nella vista frontale cade nel riquadro destro della vetrata, sopra la proiezione del meteo (se si sposta, vedi FACING in sky.js)
-const float DIST = 0.6;            // la citta' sta a qualche chilometro: tutta la veduta e' rimpicciolita di questo fattore
-const float HW0 = 0.044;           // la meta' larghezza del canale a cui sono disegnati i dettagli sottili (antenna, palme, lampioni)
-const float HWB = HW0 * DIST;      // meta' larghezza del canale
-const float VS = 1.2 * DIST;              // scala delle quote: tutte le altezze della citta' qui sotto si moltiplicano per VS
-const float DECK = 0.0176;         // piano stradale del ponte
-const float RAIL = 0.0211;         // corrimano del parapetto
-const float TW_U = -1.78, TW_R = 0.71, TW_TOP = 0.037, TW_CORD = 0.0197;   // torre tonda: centro e raggio (in u), cima, cordone
-const float MAST_U = -2.0, MAST_TOP = 0.080;                                // l'antenna sul castello
-float townU(float az) { return (az - AZB) / HWB; }
-float townK(float u) { return smoothstep(-10.5, -8.8, u) * (1.0 - smoothstep(10.2, 11.6, u)); }
-bool inTown(float u) { return u > -10.5 && u < 11.6; }
-bool inCastle(float u) { return u > -6.6 && u < -1.03; }
-// la riva del Mar Piccolo che si vede attraverso il canale: colline basse e velate
-float shoreH(float u) { return 0.0180 + 0.0030 * vnoise(vec2(u * 2.5, 5.0)); }
-float townProfile(float u) {
-  float h = 0.045;                                                      // (un solo return: ANGLE su D3D se no avverte)
-  if (u < 0.0) {
-    if (u > -1.07) h = shoreH(u);
-    else if (u > -2.38) h = TW_TOP;                                     // la torre tonda
-    else if (u > -3.52) h = u < -3.45 ? 0.0495 : 0.048;                 // il corpo alto, con il pilastro d'angolo
-    else if (u > -5.24) h = 0.044;                                      // la manica lunga
-    else if (u > -6.2) { float d = (u + 6.03) / 0.2; h = 0.040 + 0.0055 * sqrt(max(1.0 - d * d, 0.0)); }   // case e cupola dietro il bastione
-    else h = 0.024 + 0.016 * h11(floor(u * 2.5) + 40.0);                // la citta' vecchia
-  }
-  else if (u < 1.59) h = shoreH(u);
-  else if (u < 2.07) h = 0.050;
-  else if (u < 3.31) h = (u > 2.2 && u < 3.0) ? 0.079 : 0.075;          // i palazzoni del borgo
-  else if (u < 4.0) h = 0.066;
-  else if (u < 5.17) h = 0.0775;
-  else if (u < 6.28) h = 0.057;
-  else if (u < 7.3) h = 0.070;
-  else if (u < 8.4) h = 0.061;
-  else if (u < 9.6) h = 0.053;
-  return h;
-}
-// profilo di tutto quello che sta sopra l'acqua: colline lontane e, intorno al canale, la citta'
-float skyline(float az) {
-  float u = townU(az);
-  return mix(coast(az), HOR + VS * townProfile(u), townK(u));
-}
-// La citta' come un fondale di sagome piatte: per ogni punto (u, y) sotto il profilo, l'elemento piu' vicino che lo
-// copre. Restituisce (id, coordinata locale, quota, variante).
-const float P_SHORE = 1.0, P_TOWER = 2.0, P_STONE = 3.0, P_CASTLE = 4.0, P_ROOF = 5.0, P_QUAY = 6.0, P_LIGHT = 7.0;
-const float P_PALAZZO = 8.0, P_HOUSE = 9.0, P_BLOCK = 10.0, P_GREEN = 11.0, P_ARCH = 12.0;
-bool isP(float id, float k) { return abs(id - k) < 0.5; }
-// vano ad arco a tutto sesto: centro c e semilarghezza w (in u), piedritti alti h0
-float archIn(float u, float y, float c, float w, float h0) {
-  float x = (u - c) / w;
-  return step(abs(x), 1.0) * step((y - h0) / (w * HWB), sqrt(max(1.0 - x * x, 0.0)));
-}
-vec4 townPart(float u, float y) {
-  float id = P_BLOCK, lu = u, w = 0.0;
-  if (u < 0.0) {
-    float x = (u - TW_U) / (TW_R + 0.05 * (1.0 - smoothstep(0.0, 0.009, y)));           // la torre si allarga al piede
-    float gh = u < -6.2 ? 0.004 + 0.008 * vnoise(vec2(u * 9.0, 1.0)) : 0.0045 * smoothstep(0.35, 0.8, vnoise(vec2(u * 14.0, 4.0)));
-    if (y < 0.0020 && u > -6.6 && u < -0.76) id = P_STONE;                            // la banchina bassa ai piedi del castello
-    else if (abs(x) < 1.0 && y < TW_TOP) { id = P_TOWER; lu = x; }
-    else if (u > -1.07) id = P_SHORE;
-    else if (u > -7.0 && u < -5.3 && y < gh) id = P_GREEN;                            // palme basse e verde al piede
-    else if (u > -5.14 && u < -3.31 && y < 0.0234) { id = P_STONE; w = 1.0; }         // la scarpa delle mura, davanti
-    else if (u > -3.52 && u < -2.38) {
-      if (y < 0.0455 || u < -3.45) { id = P_CASTLE; lu = u + 3.52; w = 1.0; } else id = P_ROOF;
-    }
-    else if (u > -6.2 && u < -5.14 && y < 0.034) { id = P_STONE; w = 2.0; }           // il bastione
-    else if (u > -5.24 && u < -3.52) {                                                // la manica lunga
-      if (y < 0.0405) { id = P_CASTLE; lu = u + 5.24; } else id = P_ROOF;
-    }
-    else { id = P_HOUSE; w = u > -6.2 ? 0.5 : h11(floor(u * 2.5) + 40.0); }
-  }
-  else if (u < 1.38 && y < 0.0123 && u - 1.0 > 4.9 * y) { id = P_STONE; w = 3.0; }   // la spalla del ponte, a scarpa
-  else if (u >= 1.38 && u < 2.07 && y < 0.0128) {                                     // il casotto chiaro sotto l'impalcato
-    id = P_LIGHT;
-    if (archIn(u, y, 1.66, 0.085, 0.0048) > 0.5) id = P_ARCH;
-    if (archIn(u, y, 1.92, 0.085, 0.0050) > 0.5) { id = P_ARCH; w = 1.0; }            // il sottopasso
-  }
-  else if (u < 1.59) id = P_SHORE;
-  else if (u >= 2.07 && u < 6.4 && y < 0.016) id = P_QUAY;                            // il muraglione
-  else if (u < 2.07) id = P_BLOCK;
-  else if (u > 6.55 && u < 7.3 && y < 0.009) { id = P_LIGHT; w = 1.0; }               // casetta bianca sul pelo dell'acqua
-  else if (u > 6.4 && u < 7.9 && y < 0.021 + 0.009 * vnoise(vec2(u * 7.0, 2.0))) { id = P_GREEN; w = 1.0; }
-  else if (u >= 3.76 && u < 5.86 && y < 0.0455) { id = P_PALAZZO; lu = u - 3.76; }   // il palazzo rosa, con il tetto a padiglione
-  else if (u >= 3.76 && u < 5.86 && y < 0.0455 + 0.0075 * min(1.0, min(u - 3.76, 5.86 - u) / 0.3)) { id = P_ROOF; w = 1.0; }
-  else if (u < 3.0 && y < 0.046) { id = P_HOUSE; w = 0.31; }                          // le case basse sul muraglione
-  else if (u >= 3.0 && u < 3.76 && y < 0.049) { id = P_HOUSE; w = 0.67; }
-  else if (u >= 5.86 && u < 6.4 && y < 0.046) { id = P_HOUSE; w = 0.12; }
-  else if (u >= 7.9 && y < 0.010) { id = P_QUAY; w = 1.0; }
-  else if (u >= 7.9 && y < 0.026 + 0.012 * h11(floor(u * 2.2) + 7.0)) { id = P_HOUSE; w = h11(floor(u * 2.2) + 3.0); }
-  else w = u < 3.31 ? 1.0 : u < 4.0 ? 2.0 : u < 5.17 ? 3.0 : u < 6.28 ? 4.0 : u < 7.3 ? 5.0 : u < 8.4 ? 6.0 : u < 9.6 ? 7.0 : 8.0;   // dietro, i palazzoni: la variante sceglie il colore
-  return vec4(id, lu, y, w);
-}
 // quanto e' grande un pixel, in radianti (lo calcola main): i dettagli piu' piccoli di qualche pixel si vedono
 // sfumati nella loro media, come in una foto da lontano, invece di sfarfallare
 float PIX = 0.001;
 float fineK(float size) { return smoothstep(1.3, 3.5, size / PIX); }
-// finestre in griglia: passo du (in u) e dy (quote della citta') a partire dalla quota y0; fw, fh = frazione del passo occupata dal vano
-float winGrid(float u, float y, float du, float dy, float y0, float fw, float fh, out vec2 cell) {
-  vec2 g = vec2(u / du, (y - y0) / dy);
+
+vec2 puv(float az, float el) { return vec2((az - PAZ0) / (PAZ1 - PAZ0), (el - PEL0) / (PEL1 - PEL0)); }
+bool inPano(vec2 uv) { return uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0; }
+// un texel del panorama: x = classe, y = angolo della facciata (0 = di fronte), z = distanza (m), w = edificio; roof = quota del tetto
+vec4 pano(vec2 uv, out float roof) {
+  vec4 t = textureLod(uPano, uv, 0.0);
+  float r = floor(t.r * 255.0 + 0.5), c = floor(r / 16.0);
+  roof = t.a * 510.0;
+  return vec4(c, (r - c * 16.0 - 7.0) / 7.0 * 1.5708, exp(LDMIN + t.g * LDR), floor(t.b * 255.0 + 0.5));
+}
+bool isC(float c, float k) { return abs(c - k) < 0.5; }
+// quota sul mare (m) del punto visto a elevazione el e distanza d (con la curvatura della Terra)
+float hAt(float el, float d) { return (el - HOR) / PK * d + PHV + d * d * 6.83e-8; }
+// la base della riva in questa colonna (dove la terra tocca l'acqua): da li' in giu' l'acqua specchia quello che c'e' sopra
+float shoreEl(float az) {
+  vec4 s = textureLod(uStrade, vec2((az - PAZ0) / (PAZ1 - PAZ0), 0.5 / 8.0), 0.0);
+  return PEL0 + (s.r * 65280.0 + s.g * 255.0) / 65535.0 * (PEL1 - PEL0);
+}
+// finestre in griglia su una facciata: s, h in metri (lungo la facciata e in quota), passo bay x fl, vano fw x fh;
+// ps, ph = metri per pixel. Troppo piccole per vederle: la loro media.
+float facadeWin(float s, float h, float bay, float fl, float fw, float fh, float ps, float ph, out vec2 cell) {
+  vec2 g = vec2(s / bay, h / fl);
   cell = floor(g);
   vec2 f = fract(g);
-  float m = step(abs(f.x - 0.5), fw * 0.5) * step(abs(f.y - 0.5), fh * 0.5);
-  return mix(fw * fh, m, fineK(min(du * HWB * fw, dy * VS * fh))) * step(0.0, g.y);
+  float m = step(abs(f.x - 0.5), fw * 0.5) * step(abs(f.y - 0.55), fh * 0.5);
+  return mix(fw * fh, m, smoothstep(1.3, 3.5, min(bay * fw / ps, fl * fh / ph)));
 }
-// la torre del castello: qualche finestrella e, al piede, le aperture ad arco sul pelo dell'acqua
-float towerWin(float x, float y) {
-  float w = 0.0;
-  w += step(abs(x + 0.55), 0.035) * step(abs(y - 0.0262), 0.0008);
-  w += step(abs(x - 0.10), 0.035) * step(abs(y - 0.0228), 0.0008);
-  w += step(abs(x - 0.62), 0.035) * step(abs(y - 0.0262), 0.0008);
-  w += step(abs(x + 0.10), 0.035) * step(abs(y - 0.0300), 0.0008);
-  return min(w, 1.0);
+vec3 palOld(float id) {      // Citta' Vecchia: calce, ocra, rosa antico, pietra
+  float r = fract(id * 0.137 + 0.11);
+  return r < 0.25 ? vec3(0.66, 0.62, 0.55) : r < 0.45 ? vec3(0.62, 0.52, 0.38) : r < 0.6 ? vec3(0.60, 0.47, 0.42) : r < 0.8 ? vec3(0.56, 0.53, 0.48) : vec3(0.70, 0.67, 0.60);
 }
-float towerDoor(float x, float y) {
-  float d = min(min(abs(x + 0.62), abs(x + 0.05)), abs(x - 0.52));
-  return step(d, 0.045) * step(0.0021, y) * step(y, 0.0046);
+vec3 palRes(float id) {      // Borgo: intonaci chiari, ocra, qualche rosso mattone
+  float r = fract(id * 0.173 + 0.37);
+  return r < 0.22 ? vec3(0.72, 0.63, 0.48) : r < 0.42 ? vec3(0.78, 0.75, 0.68) : r < 0.58 ? vec3(0.66, 0.60, 0.49) : r < 0.7 ? vec3(0.64, 0.42, 0.33) : r < 0.85 ? vec3(0.80, 0.78, 0.73) : vec3(0.70, 0.66, 0.56);
 }
-// ponte girevole: impalcato basso e sottile sull'acqua, con la travata ad arco ribassato tra la torre e la spalla
-// del borgo; sopra il parapetto e una fila di lampioni a due bracci. A destra prosegue sopra il casotto fino al muraglione.
-const float BR_L = -1.03, BR_R = 2.1;
-float bridgeUnder(float u) { float a = (u - 0.16) / 1.19; return u < 1.35 ? 0.0150 - 0.0032 * a * a : 0.0128; }
-float bridgeMask(float u, float y, float edge) {
-  float yb = bridgeUnder(u);
-  return step(BR_L, u) * step(u, BR_R) * smoothstep(yb - edge, yb + edge, y) * (1.0 - smoothstep(DECK - edge, DECK + edge, y));
-}
-// i vuoti della travata, tra la soletta, il corrente ad arco sotto e i montanti: da li' si vede quello che c'e' dietro
-float trussGap(float u, float y) {
-  float f = fract((u - BR_L) / 0.09);
-  return step(u, 1.35) * step(0.13, f) * step(f, 0.87) * step(bridgeUnder(u) + 0.0009, y) * step(y, DECK - 0.0016);
-}
-const int LAMPS = 5;               // lampioni sul parapetto (ognuno con due lanterne)
-float lampU(int i) { return -0.83 + float(i) * 0.71; }
-const float LAMP_Y = RAIL + 0.0044;
 
-// --- traffico: auto sul ponte e sul lungomare del borgo, nei due sensi ---
-const int CARS = 6;
-// auto i: x = posizione lungo la strada (in mezze larghezze di canale), y = quanto si vede (sfuma ai capi), z = verso.
-// A sinistra la strada passa dietro la torre del castello: li' le auto spariscono.
-vec3 carAt(int i, float t) {
-  float fi = float(i);
-  float dirn = mod(fi, 2.0) < 0.5 ? 1.0 : -1.0;
-  float ph = fract(t * (0.020 + 0.009 * h11(fi * 5.7 + 1.0)) + h11(fi * 9.1 + 4.0));
-  float x = mix(-1.6, 6.3, dirn > 0.0 ? ph : 1.0 - ph);
-  return vec3(x, smoothstep(0.0, 0.05, ph) * (1.0 - smoothstep(0.95, 1.0, ph)) * step(-1.02, x), dirn);
-}
-float roadY(float u) { return mix(DECK + 0.0009, 0.0168, smoothstep(2.0, 2.4, u)); }   // dal ponte scende sul muraglione
-// --- palme sul muraglione del borgo: fusto sottile e un ciuffo di fronde che ricadono ---
-float palm(float u, float y, float u0, float top, float edge) {
-  if (abs(u - u0) > 0.25 || y < 0.016 || y > top + 0.006) return 0.0;
-  float k = (y - 0.016) / (top - 0.016);
-  float trunk = (1.0 - smoothstep(0.00022, 0.00022 + edge, abs(u - u0 - 0.05 * k * k) * HW0)) * step(y, top);
-  vec2 p = vec2((u - u0 - 0.05) * HW0, y - top);
-  float a = atan(p.y, p.x);
-  float r = 0.0048 * (0.35 + 0.65 * pow(abs(cos(a * 3.5)), 0.6)) * (p.y < 0.0 ? 0.85 : 0.6);
-  return max(trunk, 1.0 - smoothstep(r - edge, r + edge, length(p)));
-}
-// l'antenna del castello: un traliccio che si assottiglia, con due pennoni
-float mast(float u, float y, float edge) {
-  if (abs(u - MAST_U) > 0.12 || y < TW_TOP - 0.001 || y > MAST_TOP) return 0.0;
-  float x = abs(u - MAST_U) * HW0, k = (y - TW_TOP) / (MAST_TOP - TW_TOP);
-  float pole = 1.0 - smoothstep(0.0, edge, x - mix(0.00050, 0.00012, k));
-  float yard = (1.0 - smoothstep(0.0, edge, abs(y - 0.0726) - 0.00012)) * step(x, 0.0028)
-             + (1.0 - smoothstep(0.0, edge, abs(y - 0.0660) - 0.00012)) * step(x, 0.0021);
-  return min(pole + yard, 1.0) * min(1.0, 0.0006 / edge);
-}
 // --- una barca attraversa piano lo specchio d'acqua, da sinistra a destra ---
-const float BOAT_EL = -0.0585;     // sta sull'acqua, piu' vicina della costa di fronte
+const float BOAT_EL = -0.0585;
 float boatAz(float t) { return -0.62 + fract(t / 150.0 + 0.2) * 1.5; }
 
 vec3 sky(float az, float el, float t) {
@@ -413,232 +296,6 @@ vec3 sky(float az, float el, float t) {
   return col;
 }
 
-// quota (sopra l'acqua) della luce del lungomare nella fila row all'azimut a; negativa se li' non ce n'e'.
-// Nel canale e sotto il ponte niente (ci sono i lampioni del ponte); sul castello solo i fari al piede delle mura,
-// che lo illuminano dal basso; sul borgo i lampioni in cima al muraglione.
-float shoreLightY(float a, int row, float jit) {
-  float u = townU(a);
-  if (u > -1.03 && u < BR_R) return -1.0;
-  if (inCastle(u)) return row == 0 ? 0.0016 * VS : -1.0;
-  if (u >= BR_R && u < 6.4) return row == 0 ? (0.0174 + jit * 0.0004) * VS : -1.0;
-  return 0.0022 + float(row) * 0.0045 + jit * 0.0022;
-}
-// luci della costa: celle lungo l'azimut, due file sul lungomare + sparse sulle colline
-vec3 lightsAt(float az, float el, float blur, float coastEl, float t) {
-  vec3 acc = vec3(0.0);
-  float cell = 0.0075;
-  float id0 = floor(az / cell);
-  float rad = 0.0009 + blur * 0.0013;
-  for (int k = -1; k <= 1; k++) {
-    float id = id0 + float(k);
-    for (int row = 0; row < 2; row++) {
-      float sd = id * 1.37 + float(row) * 17.1;
-      if (h11(sd) > (row == 0 ? 0.42 : 0.2)) continue;
-      float a = (id + 0.5 + (h11(sd + 3.1) - 0.5) * 0.7) * cell;
-      float e = shoreLightY(a, row, h11(sd + 5.3));
-      if (e < 0.0) continue;
-      e += HOR;
-      float far = townK(townU(a));                              // in citta' le luci sono lontane: piu' piccole e deboli
-      vec2 d = vec2(az - a, el - e);
-      float rr = rad * (1.0 - 0.3 * far);
-      float g = exp(-dot(d, d) / (rr * rr)) * (1.0 - 0.3 * far);
-      float boost;
-      vec3 c = lightCol(sd, boost);
-      if (inCastle(townU(a))) { c = SODIUM; boost = 1.0; }       // i fari del castello sono tutti caldi
-      float flick = 0.88 + 0.12 * sin(t * (3.0 + h11(sd) * 5.0) + sd);
-      acc += c * g * (0.9 + h11(sd + 1.9) * 1.3) * flick * boost;
-    }
-  }
-  // colline: punti sparsi sotto il profilo
-  vec2 gc = vec2(az / 0.008, (el - HOR) / 0.006);
-  vec2 gi = floor(gc);
-  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
-    vec2 id = gi + vec2(i, j);
-    float hs = h21(id + 31.0);
-    if (hs > 0.16) continue;
-    vec2 p = (id + 0.5 + (h22(id) - 0.5) * 0.8) * vec2(0.008, 0.006);
-    float pe = HOR + p.y;
-    if (pe > coastEl - 0.003 || pe < HOR + 0.011) continue;
-    if (townK(townU(p.x)) > 0.5) continue;                      // in citta' le finestre accese sono sulle facciate (townNight); il castello non ne ha
-    vec2 d = vec2(az - p.x, el - pe);
-    float g = exp(-dot(d, d) / (rad * rad * 0.7));
-    acc += (hs < 0.04 ? COLD : SODIUM) * g * 0.7;
-  }
-  return acc;
-}
-
-// luci rosse intermittenti lontane (ciminiere, antenne)
-vec3 redLights(float az, float el, float blur, float t) {
-  vec3 acc = vec3(0.0);
-  float rad = 0.0013 + blur * 0.0015;
-  for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    // mai sopra il canale: li' non c'e' niente che li regga. Una e' in cima all'antenna del castello, una sul palazzone piu' alto del borgo
-    float a = i == 0 ? -0.42 : i == 1 ? -0.15 : i == 2 ? AZB + MAST_U * HWB : 0.376;
-    float e = i == 2 ? HOR + VS * MAST_TOP + 0.0006 : skyline(a) + 0.0045;       // appena sopra un crinale o un tetto: un'antenna
-    vec2 d = vec2(az - a, el - e);
-    float on = smoothstep(0.0, 0.08, fract(t * 0.45 + fi * 0.31)) * (1.0 - smoothstep(0.42, 0.52, fract(t * 0.45 + fi * 0.31)));
-    float r = i >= 2 ? rad * 0.6 : rad;                                   // quelle sulla citta' sono lontane: piccole
-    acc += vec3(1.0, 0.07, 0.03) * exp(-dot(d, d) / (r * r)) * on * (i >= 2 ? 2.2 : 3.0);
-  }
-  return acc;
-}
-
-vec3 water(float az, float el, float blur, float t) {
-  float dep = max(HOR - el, 0.0004);               // depressione sotto l'orizzonte
-  vec2 wp = vec2(az / dep, 1.0 / dep);             // coordinate sul piano dell'acqua
-  // il vento cambia le onde: con la calma poche increspature, larghe e lente; con il vento fitte, alte e svelte
-  float tw = uWaveT, rf = wm(0.55, 1.0, 1.7), rh = wm(0.3, 1.0, 1.7);
-  float big = fbm3(vec2(wp.x * 0.9 * rf, wp.y * 0.55 * rf - tw * 0.35));
-  float rip = (big - 0.5) * rh;
-  float wobA = wm(0.6, 1.0, 2.6), wobF = wm(0.6, 1.0, 2.2);    // quanto e quanto in fretta il riflesso trema di lato
-  float wid = wm(0.85, 1.0, 1.9);                              // larghezza dei riflessi
-  float gap = wm(0.8, 1.0, 0.8);                               // i riflessi larghi si spalmano e perdono luce
-  float bLo = wm(0.0, 0.38, 0.52), bHi = wm(0.55, 0.75, 0.82), bF = wm(0.6, 1.0, 2.4);   // soglie e frequenza delle rotture
-  float lenK = wm(1.5, 1.0, 0.6);                              // lunghezza dei riflessi: lunghi con la calma, corti con il vento
-  float fres = 0.04 + 0.96 * pow(1.0 - smoothstep(0.0, 0.35, dep), 5.0);
-  vec3 col = vec3(0.004, 0.007, 0.012);
-  col += sky(az + rip * dep * 0.6, HOR + dep * 0.9 + rip * 0.01, t) * (0.35 + 0.5 * fres);
-  // riflessi allungati e tremolanti delle luci del lungomare
-  float cell = 0.0075;
-  float id0 = floor(az / cell);
-  for (int k = -1; k <= 1; k++) {
-    float id = id0 + float(k);
-    for (int row = 0; row < 2; row++) {
-      float sd = id * 1.37 + float(row) * 17.1;
-      if (h11(sd) > (row == 0 ? 0.42 : 0.2)) continue;
-      float a = (id + 0.5 + (h11(sd + 3.1) - 0.5) * 0.7) * cell;
-      if (shoreLightY(a, row, 0.0) < 0.0) continue;
-      float wob = (vnoise(vec2(wp.y * 0.35 * wobF + id, tw * 1.3)) - 0.5) * dep * 0.07 * wobA;
-      float far = townK(townU(a));                              // le luci della citta' lontana: riflessi piu' sottili e deboli
-      float w = (0.0006 + dep * 0.007 + blur * 0.0009) * wid * (1.0 - 0.25 * far);
-      float dx = (az - a + wob) / w;
-      float streak = exp(-dx * dx) * (1.0 - 0.3 * far);
-      float broken = smoothstep(bLo, bHi, vnoise(vec2(id * 3.1 + float(row), wp.y * 0.45 * bF - tw * 1.8)));
-      float len = exp(-dep / ((0.028 + float(row) * 0.01) * lenK));
-      float boost;
-      vec3 c = lightCol(sd, boost);
-      if (inCastle(townU(a))) { c = SODIUM; boost = 1.0; }
-      col += c * streak * broken * len * (row == 0 ? 0.75 : 0.35) * boost * gap;
-    }
-  }
-  // riflessi del ponte girevole, del castello illuminato e del muraglione
-  float u = townU(az);
-  if (u > -7.0 && u < 7.0) {
-    float wobb = (vnoise(vec2(wp.y * 0.35 * wobF + 5.0, tw * 1.3)) - 0.5) * dep * 0.07 * wobA;
-    float uu = u + wobb / HWB;
-    float brk = smoothstep(wm(0.0, 0.3, 0.5), bHi, vnoise(vec2(u * 26.0, wp.y * 0.45 * bF - tw * 1.8)));
-    float w = (0.0006 + dep * 0.007 + blur * 0.0009) * wid;
-    if (uu > BR_L - 0.2 && uu < BR_R + 0.2) {
-      for (int i = 0; i < LAMPS; i++) {
-        float dx = (uu - lampU(i)) * HWB / w;
-        col += SODIUM * exp(-dx * dx) * brk * exp(-dep / (0.03 * lenK)) * 0.28 * gap;
-      }
-      // il ponte capovolto scurisce l'acqua con la sua sagoma (arcata e impalcato), non con una fascia rettangolare
-      col *= 1.0 - 0.4 * bridgeMask(uu, dep * 1.1 / VS, 0.0014 + dep * 0.06) * exp(-dep / 0.09) * (0.55 + 0.45 * brk);
-      for (int i = 0; i < CARS; i++) {                           // i fari delle auto che passano sul ponte
-        vec3 c = carAt(i, t);
-        if (c.x < 1.1) { float dx = (uu - c.x) * HWB / w; col += vec3(1.0, 0.93, 0.78) * exp(-dx * dx) * brk * exp(-dep / (0.025 * lenK)) * 0.16 * c.y * gap; }
-      }
-    }
-    // la pietra calda del castello (piu' forte sotto la torre) e, piu' tenue, il muraglione del borgo
-    float stoneK = inCastle(uu) ? (uu > TW_U - TW_R ? 1.15 : 0.8) : (uu > 1.0 && uu < 6.4 ? 0.4 : 0.0);
-    col += vec3(0.085, 0.050, 0.020) * stoneK * 0.8 * exp(-dep / (0.016 * lenK)) * (0.3 + 0.7 * brk);
-  }
-  if (uMoon.w > 0.0) {                                           // la scia della Luna sull'acqua
-    float mx = (az - uMoon.x) / ((0.012 + dep * 0.45) * wm(0.6, 1.0, 1.6));        // calma: scia stretta; vento: larga
-    float glit = smoothstep(wm(0.0, 0.35, 0.55), wm(0.4, 0.8, 0.9), vnoise(vec2(wp.x * 2.0 * wm(0.7, 1.0, 2.2), wp.y * 0.6 * wm(0.7, 1.0, 1.9) - tw * 1.2)));
-    col += vec3(0.55, 0.58, 0.62) * exp(-mx * mx) * glit * uMoon.z * (1.0 - smoothstep(0.15, 0.75, uCloud)) * 0.35 * wm(1.4, 1.0, 0.9) * exp(-dep / (0.25 * wm(1.4, 1.0, 0.8)));
-  }
-  // riflesso rosso tremolante
-  col += redLights(az + (vnoise(vec2(wp.y * 0.3, tw)) - 0.5) * dep * 0.1 * wobA, HOR + dep * 0.25 + 0.01, blur + 1.5, t) * 0.25 * exp(-dep / 0.05);
-  return col;
-}
-
-// finestra accesa di notte: una su tre circa, calda o fredda, di forza diversa
-vec3 litWin(vec2 cell, float seed, float prob) {
-  float r = h21(cell + seed * 17.3);
-  if (r > prob) return vec3(0.0);
-  vec3 c = h21(cell + seed * 5.1 + 3.0) < 0.72 ? vec3(1.0, 0.62, 0.30) : vec3(0.70, 0.80, 1.0);
-  return c * (0.30 + 0.45 * h21(cell + 7.7));
-}
-// facciate di notte: il castello illuminato dal basso (pietra calda), il muraglione dai lampioni che ha sopra,
-// le case e i palazzoni del borgo scuri con le finestre accese
-vec3 townNight(float u, float y) {
-  vec4 p = townPart(u, y);
-  float id = p.x;
-  vec3 dark = vec3(0.012, 0.011, 0.013);
-  vec3 c = dark + vec3(0.07, 0.042, 0.02) * exp(-y / 0.007);
-  float stone = 0.85 + 0.15 * vnoise(vec2(u * 60.0, y * 1400.0));
-  vec2 cell;
-  if (u < 0.0 && (isP(id, P_TOWER) || isP(id, P_STONE) || isP(id, P_CASTLE))) {
-    float shade = 0.34;                                           // muri in ombra, la torre tonda in luce
-    if (isP(id, P_TOWER)) {
-      float x = p.y, rnd = sqrt(max(1.0 - x * x, 0.0));
-      shade = (0.18 + 0.95 * rnd * rnd) * (1.0 - 0.5 * (1.0 - smoothstep(0.0, 0.0011, abs(y - TW_CORD))));
-      shade *= 1.0 - 0.3 * step(TW_TOP - 0.0013, y) - 0.7 * towerWin(x, y);
-    } else if (isP(id, P_STONE)) shade = p.w < 0.5 ? 0.75 : p.w < 1.5 ? 0.62 : 0.5;
-    else { float w = winGrid(p.y, y, 0.30, 0.0058, 0.0255, 0.17, 0.25, cell); shade *= 1.0 - 0.6 * w * step(0.3, h21(cell + p.w * 9.0)); }
-    float foot = 0.28 + 0.72 * exp(-y / 0.012);
-    c = dark + vec3(0.30, 0.175, 0.075) * shade * foot * stone * 0.95;  // luce bassa e calda, non un faro
-    if (isP(id, P_TOWER)) c += vec3(0.30, 0.17, 0.06) * towerDoor(p.y, y);   // le aperture al piede, accese
-  } else if (isP(id, P_ROOF)) {
-    c = dark * 1.2;
-  } else if (isP(id, P_QUAY) || isP(id, P_STONE)) {
-    float top = isP(id, P_QUAY) && p.w < 0.5 ? 0.016 : 0.0123;
-    c = dark + vec3(0.30, 0.175, 0.075) * 0.5 * 0.55 * (0.35 + 0.65 * exp(-max(top - y, 0.0) / 0.005)) * stone;   // schiarito dall'alto, dai lampioni
-    if (isP(id, P_QUAY) && u > 2.62 && u < 3.52 - 28.0 * y && y < 0.0105) c *= 0.6;   // lo scivolo, piu' scuro
-  } else if (isP(id, P_LIGHT)) {
-    c = dark + vec3(0.30, 0.20, 0.11) * 0.22 * stone;
-  } else if (isP(id, P_ARCH)) {
-    c = p.w > 0.5 ? vec3(0.20, 0.11, 0.04) * (0.6 + 0.4 * exp(-y / 0.004)) : dark;   // il sottopasso e' illuminato dentro
-  } else if (isP(id, P_PALAZZO)) {
-    c = dark + vec3(0.11, 0.045, 0.04) * (0.2 + 0.6 * exp(-(y - 0.016) / 0.008));
-    float w = winGrid(p.y, y, 0.16, 0.0068, 0.0245, 0.42, 0.52, cell);
-    c += litWin(cell, 2.0, 0.26) * w * 0.8;
-  } else if (isP(id, P_HOUSE)) {
-    float w = winGrid(u, y, 0.14, 0.0058, u < 0.0 ? 0.004 : 0.017, 0.45, 0.5, cell);
-    c += litWin(cell, p.w * 9.0 + 1.0, 0.22) * w;
-  } else if (isP(id, P_BLOCK)) {
-    float fy = fract((y - 0.016) / 0.0048);
-    c = dark + vec3(0.010, 0.009, 0.010) * mix(0.2, step(fy, 0.2), fineK(0.0048 * VS * 0.2));          // i frontalini dei balconi, appena schiariti
-    float w = winGrid(u, y, 0.11, 0.0048, 0.016, 0.45, 0.5, cell);
-    c += litWin(cell, p.w + 3.0, 0.22) * w * step(0.2, fy) * 0.85;
-  } else if (isP(id, P_GREEN)) {
-    c = vec3(0.006, 0.008, 0.007);
-  } else if (isP(id, P_SHORE)) {                                   // la riva del Mar Piccolo: buia, con qualche luce lontana
-    c = vec3(0.014, 0.012, 0.018);
-    vec2 g = vec2(u / 0.06, y / 0.0022), f = fract(g) - 0.5, gi = floor(g);
-    if (y < 0.0032 && h21(gi + 51.0) < 0.16) c += SODIUM * (1.0 - smoothstep(0.12, 0.3, length(f * vec2(1.0, 0.5)))) * 0.45;
-  }
-  return c;
-}
-// Ponte di notte: una sagoma in controluce sul chiarore dell'orizzonte, con i lampioni dello stesso colore
-// e della stessa forza di quelli del lungomare. Deve stare dentro il paesaggio, non staccarsi.
-vec3 bridgeNight(vec3 col, float u, float y, float blur, float t) {
-  float edge = (0.0005 + blur * 0.0010) / DIST;                  // in quote della citta': da lontano i bordi sono piu' morbidi
-  float yb = bridgeUnder(u);
-  vec3 steel = vec3(0.015, 0.016, 0.021) + vec3(0.040, 0.024, 0.011) * exp(-max(DECK - y, 0.0) / 0.004);
-  col = mix(col, mix(steel, col, 0.6 * trussGap(u, y)), bridgeMask(u, y, edge));
-  float rail = (1.0 - smoothstep(0.0, 0.0003 + edge, abs(y - RAIL))) + 0.35 * step(DECK, y) * step(y, RAIL);   // il parapetto
-  col = mix(col, steel, rail * step(BR_L, u) * step(u, BR_R) * 0.7);
-  if (u > BR_L && u < 1.35) {                                    // un filo di luce calda sotto l'arco, riflessa dall'acqua
-    float da = (y - yb) * VS / (0.0007 + blur * 0.0011);
-    col += vec3(0.085, 0.050, 0.020) * exp(-da * da);
-  }
-  float rad = 0.0007 + blur * 0.0010;                            // luci lontane: piccole
-  for (int i = 0; i < LAMPS; i++) {
-    float fi = float(i);
-    float post = (1.0 - smoothstep(0.0, edge, abs(u - lampU(i)) * HW0 - 0.00012)) * step(RAIL, y) * step(y, LAMP_Y + 0.0006);
-    col = mix(col, steel, post * 0.8);
-    float flick = 0.9 + 0.1 * sin(t * (2.0 + h11(fi + 2.0) * 3.0) + fi);
-    for (int s = -1; s <= 1; s += 2) {                           // due lanterne per lampione
-      vec2 d = vec2((u - lampU(i) - float(s) * 0.05) * HWB, (y - LAMP_Y) * VS);
-      col += SODIUM * exp(-dot(d, d) / (rad * rad)) * (0.36 + 0.26 * h11(fi + 4.0)) * flick;
-    }
-  }
-  return col;
-}
 
 // luci di via della barca: bianca in testa d'albero, verde sul fianco che ci guarda, con un riflesso corto
 vec3 boatNight(float az, float el, float blur, float t) {
@@ -651,47 +308,6 @@ vec3 boatNight(float az, float el, float blur, float t) {
     c += vec3(1.0, 0.95, 0.85) * exp(-dx * dx) * exp(-below / 0.006) * 0.25 * (0.6 + 0.4 * sin(t * 5.0 + below * 900.0));
   }
   return c;
-}
-
-vec3 outside(vec3 dir, float blur, float t) {
-  float az = atan(dir.x, -dir.z);
-  float el = asin(clamp(dir.y, -1.0, 1.0));
-  vec3 col = vec3(0.0);
-  if (el < HOR) {
-    col = water(az, el, blur, t) + boatNight(az, el, blur, t);
-  } else {
-    float u = townU(az), y = (el - HOR) / VS;   // y: quota sopra l'acqua, nella scala della citta'
-    float ce = skyline(az);
-    float edge = 0.0012 + blur * 0.002;
-    float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
-    vec3 hill = vec3(0.008, 0.008, 0.011) + vec3(0.025, 0.014, 0.008) * exp(-(el - HOR) / 0.02);
-    float yc = min(y, (ce - HOR) / VS - 0.0002);                 // sul bordo del profilo il colore e' quello dell'elemento sotto
-    vec3 skyc = sky(az, el, t);
-    // la citta' e' lontana: l'aria in mezzo la vela del chiarore dell'orizzonte (meno contrasto, finestre piu' deboli)
-    vec3 veil = skyc * 1.2 + vec3(0.016, 0.010, 0.012);
-    if (inTown(u)) hill = mix(hill, mix(townNight(u, yc), veil, 0.32), townK(u));
-    col = mix(skyc, hill, land);
-    if (u > -2.2 && u < 7.0) {                                   // l'antenna del castello e le palme del borgo, in controluce
-      vec3 sil = vec3(0.016, 0.014, 0.017) + vec3(0.05, 0.03, 0.012) * exp(-max(y - TW_TOP, 0.0) / 0.006);
-      float e2 = edge * 0.5 / DIST;
-      col = mix(col, mix(sil, veil, 0.3), max(mast(u, y, e2), max(palm(u, y, 6.3, 0.049, e2), palm(u, y, 6.85, 0.046, e2))));
-    }
-    col += lightsAt(az, el, blur, ce, t);
-    col += redLights(az, el, blur, t);
-    if (u > BR_L - 0.1 && u < BR_R + 0.1) col = bridgeNight(col, u, y, blur, t);
-    if (u > -1.1 && u < 6.5 && y < 0.03) {                               // auto: fari chiari davanti, luci rosse dietro
-      float cr = 0.0006 + blur * 0.0010;
-      for (int i = 0; i < CARS; i++) {
-        vec3 c = carAt(i, t);
-        float ry = roadY(c.x);
-        vec2 dh = vec2((u - c.x - c.z * 0.05) * HWB, (y - ry) * VS), dr = vec2((u - c.x + c.z * 0.05) * HWB, (y - ry) * VS);
-        col += (vec3(1.0, 0.93, 0.78) * exp(-dot(dh, dh) / (cr * cr)) + vec3(1.0, 0.10, 0.05) * exp(-dot(dr, dr) / (cr * cr)) * 0.6) * c.y * 0.75;
-      }
-    }
-  }
-  // foschia sul pelo dell'acqua
-  col += vec3(0.05, 0.04, 0.035) * exp(-abs(el - HOR) / 0.006) * 0.5;
-  return col;
 }
 
 // --- lo stesso panorama di giorno, con cielo coperto ---
@@ -718,7 +334,7 @@ void sunSetup() {
   float clearSky = 1.0 - smoothstep(0.25, 0.85, uCloud);
   SUNK = uSun.w * clearSky * smoothstep(-0.02, 0.07, uSun.z);
   SUNCOL = mix(vec3(1.0, 0.92, 0.80), vec3(1.0, 0.58, 0.30), 1.0 - smoothstep(0.04, 0.5, uSun.z));
-  SUN_AZ = AZB + atan(uSun.x, uSun.y) / 4.0;
+  SUN_AZ = atan(uSun.x, uSun.y) / 4.0;           // uSun e' rispetto alla normale della vetrata
   SUN_EL = HOR + uSun.z / 4.0;
 }
 // Il "filtro" del sereno, come in una foto: una fascia di foschia luminosa sul pelo dell'orizzonte (piu' chiara dalla
@@ -741,136 +357,231 @@ vec3 clearFilter(vec3 col, float az, float el) {
   float luma = dot(col, vec3(0.3, 0.55, 0.15));
   return mix(col, col * mix(vec3(0.95, 0.99, 1.05), vec3(1.05, 1.0, 0.93), smoothstep(0.1, 0.6, luma)), SUNK * 0.7);
 }
-// facciate di giorno, con la luce piatta del coperto: la pietra color sabbia del castello e del muraglione, il palazzo
-// rosa, i palazzoni chiari a fasce di balconi. haze = il colore della foschia, che vela tutto (la riva lontana di piu').
-const vec3 SAND = vec3(0.47, 0.32, 0.17);   // colori lineari: a schermo escono piu' chiari
-// fine: i dettagli piccoli (conci, cannoniere, tapparelle, persiane, fiancate, pietra bagnata). Il riflesso nell'acqua
-// la chiama con false: li' non si vedrebbero, e con una costante il compilatore li toglie da quella copia della funzione.
-vec3 townDay(float u, float y, vec3 haze, bool fine) {
-  vec4 p = townPart(u, y);
-  float id = p.x, n = vnoise(vec2(u * 60.0, y * 1400.0));
-  vec3 c = vec3(0.6);
-  float hz = 0.26;                                                  // la foschia dei chilometri d'aria in mezzo
+
+
+// facciate di notte: tutto scuro, con le finestre accese; il castello e le chiese illuminati dal basso, i muraglioni
+// dai lampioni che hanno sopra. veil = il chiarore dell'aria della citta', che vela le cose lontane.
+vec3 panoNight(vec4 P, float roof, float az, float el, vec3 veil, bool fine) {
+  float c = P.x, phi = P.y, d = P.z, id = P.w;
+  float h = hAt(el, d), cph = max(cos(phi), 0.3);
+  float s = az * d / cph, ps = PIX * d / cph, ph = PIX * d / PK;
+  vec3 dark = vec3(0.012, 0.011, 0.013), col = dark;
+  vec3 warm = vec3(0.30, 0.175, 0.075);
+  float stone = fine ? 0.85 + 0.15 * vnoise(vec2(s * 1.3, h * 2.0)) : 1.0;
   vec2 cell;
-  if (isP(id, P_TOWER)) {
-    float x = p.y;
-    float shade = 0.52 + 0.48 * sqrt(max(1.0 - x * x, 0.0)) - 0.14 * x;        // tonda: piu' chiara al centro e verso la luce
-    shade *= 1.0 - 0.32 * step(TW_CORD - 0.0009, y) * step(y, TW_CORD) + 0.10 * step(TW_CORD, y) * step(y, TW_CORD + 0.0006);   // il cordone
-    shade *= 1.0 - 0.08 * step(TW_TOP - 0.0012, y);
-    c = SAND * shade * (0.92 + 0.08 * n);
-    c = mix(c, vec3(0.12, 0.10, 0.08), max(towerWin(x, y), towerDoor(x, y)) * 0.85);
-  } else if (isP(id, P_STONE)) {
-    c = SAND * (p.w < 0.5 ? 1.04 : p.w < 1.5 ? 0.84 : p.w < 2.5 ? 0.92 : 0.86) * (0.9 + 0.1 * n);   // banchina, scarpa, bastione, spalla
-    if (p.w > 1.5 && p.w < 2.5) {                                                                  // il bastione e' tondo anche lui, con il suo cordone
-      float bx = (u + 5.67) / 0.53;
-      c *= (0.75 + 0.25 * sqrt(max(1.0 - bx * bx, 0.0))) * (1.0 - 0.25 * step(abs(y - 0.027), 0.0005));
-    }
-  } else if (isP(id, P_CASTLE)) {
-    c = SAND * (p.w < 0.5 ? 1.0 : 0.94) * (0.92 + 0.08 * n);
-    if (fine) c *= 1.0 - 0.06 * step(fract(y / 0.0013), 0.14) * fineK(0.0013 * VS * 0.14);      // i corsi dei conci
-    float w = winGrid(p.y, y, 0.30, 0.0058, 0.0255, 0.17, 0.25, cell);
-    c = mix(c, vec3(0.12, 0.10, 0.08), w * step(0.3, h21(cell + p.w * 9.0)) * 0.85);
-    if (fine) {                                                                                     // le cannoniere sotto il coronamento
-      float cn = step(abs(fract(p.y / 0.22 + 0.5) - 0.5), 0.08) * step(abs(y - 0.0378), 0.0007);
-      c = mix(c, vec3(0.10, 0.08, 0.07), cn * mix(0.3, 0.85, fineK(0.0014 * VS)));
-    }
-  } else if (isP(id, P_ROOF)) {
-    c = u < 0.0 ? vec3(0.30, 0.19, 0.13) : vec3(0.42, 0.17, 0.12);
-  } else if (isP(id, P_QUAY)) {
-    c = SAND * (p.w < 0.5 ? 1.0 : 0.9) * (0.88 + 0.12 * vnoise(vec2(u * 30.0, y * 260.0)));      // macchie e colature
-    c *= 1.0 - 0.06 * step(fract(y / 0.0016), 0.12);                                           // i corsi dei conci
-    if (p.w < 0.5) {
-      c *= 1.0 + 0.08 * step(0.0148, y);                                                         // la cimasa del parapetto
-      if (u > 2.62 && u < 3.52 - 28.0 * y && y < 0.0105) c *= 0.62 + 0.18 * vnoise(vec2(u * 50.0, 3.0));   // lo scivolo, piu' scuro e rigato
-      c *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 0.0004, abs(y - (0.0155 - (u - 4.95) * 0.023)))) * step(4.95, u) * step(u, 5.45);   // la scala in diagonale
-    }
-  } else if (isP(id, P_LIGHT)) {
-    c = vec3(0.70, 0.66, 0.58) * (0.94 + 0.06 * n);
-  } else if (isP(id, P_ARCH)) {
-    c = p.w > 0.5 ? vec3(0.05, 0.045, 0.04) : vec3(0.48, 0.44, 0.38);
-  } else if (isP(id, P_PALAZZO)) {
-    float lu = p.y;
-    c = y < 0.0235 ? vec3(0.68, 0.42, 0.34) : vec3(0.62, 0.29, 0.25);                          // il piano terra bugnato, piu' chiaro
-    float w = winGrid(lu, y, 0.16, 0.0068, 0.0245, 0.42, 0.52, cell);
-    float fr = winGrid(lu, y, 0.16, 0.0068, 0.0245, 0.56, 0.66, cell);
-    c = mix(c, vec3(0.80, 0.75, 0.68), (fr - w) * 0.8);                                         // le cornici bianche
-    c = mix(c, vec3(0.14, 0.11, 0.12), w);
-    c = mix(c, vec3(0.78, 0.72, 0.64), step(0.0440, y) + step(abs(y - 0.0240), 0.0005) + step(lu, 0.07) + step(2.03, lu));   // cornicione, marcapiano, paraste d'angolo
-  } else if (isP(id, P_HOUSE)) {
-    // le case basse: bianco calce, ocra, rosa antico, grigio pietra
-    c = p.w < 0.25 ? vec3(0.68, 0.64, 0.57) : p.w < 0.5 ? vec3(0.64, 0.50, 0.34) : p.w < 0.75 ? vec3(0.63, 0.46, 0.41) : vec3(0.56, 0.53, 0.47);
-    float w = winGrid(u, y, 0.14, 0.0058, u < 0.0 ? 0.004 : 0.017, 0.45, 0.5, cell);
-    // le persiane: verdi o marroni, chiuse in una finestra su tre; le altre aperte sul vetro scuro
-    vec3 pane = vec3(0.16, 0.15, 0.15);
-    if (fine) { float r = h21(cell + p.w * 13.0 + 5.0); pane = r < 0.2 ? vec3(0.20, 0.31, 0.22) : r < 0.32 ? vec3(0.36, 0.24, 0.16) : pane; }
-    c = mix(c, pane, w * 0.8);
-  } else if (isP(id, P_BLOCK)) {
-    float b = p.w;
-    c = b < 0.5 ? vec3(0.48, 0.32, 0.22) : b < 1.5 ? vec3(0.72, 0.63, 0.48) : b < 2.5 ? vec3(0.78, 0.78, 0.75) : b < 3.5 ? vec3(0.56, 0.33, 0.20)
-      : b < 4.5 ? vec3(0.66, 0.60, 0.48) : b < 5.5 ? vec3(0.80, 0.80, 0.77) : mix(vec3(0.70, 0.64, 0.52), vec3(0.78, 0.77, 0.73), fract(b * 0.37));
-    float fy = fract((y - 0.016) / 0.0048);
-    float w = winGrid(u, y, 0.11, 0.0048, 0.016, 0.55, 0.55, cell);
-    if (fine) {
-      // la fiancata di ogni palazzone, di scorcio sul lato sinistro: in ombra, o al sole se il sole arriva da sinistra
-      float bs = u < 3.31 ? 2.07 : u < 4.0 ? 3.31 : u < 5.17 ? 4.0 : u < 6.28 ? 5.17 : u < 7.3 ? 6.28 : u < 8.4 ? 7.3 : u < 9.6 ? 8.4 : 9.6;
-      float side = 1.0 - smoothstep(0.075, 0.085, u - bs);
-      c *= mix(1.0, mix(0.8, uSun.x < 0.0 ? 1.12 : 0.66, SUNK), side);
-      w *= 1.0 - side;
-    }
-    vec3 recess = c * 0.58;                                                                       // in ombra sotto il balcone di sopra
-    c = mix(recess, c * 1.05, mix(0.22, step(fy, 0.22), fineK(0.0048 * VS * 0.22)));              // le fasce chiare dei balconi
-    // le tapparelle: abbassate del tutto, a meta' o alzate (vetro scuro), finestra per finestra
-    vec3 pane = vec3(0.17, 0.19, 0.22);
-    if (fine) {
-      float r = h21(cell + b * 7.0), level = r < 0.3 ? 1.0 : r < 0.58 ? 0.5 : 0.0;
-      float v = clamp((fy - 0.225) / 0.55, 0.0, 1.0);                                             // 0 al davanzale, 1 in alto
-      pane = mix(pane, c * 0.82 + 0.05, mix(level * 0.9, step(1.0 - level, v), fineK(0.0048 * VS * 0.55)));
-    }
-    c = mix(c, pane, w * step(0.22, fy) * 0.6);
-  } else if (isP(id, P_GREEN)) {
-    c = vec3(0.11, 0.17, 0.09) * (0.75 + 0.35 * vnoise(vec2(u * 40.0, y * 900.0)));
-  } else if (isP(id, P_SHORE)) {
-    // la riva del Mar Piccolo, qualche chilometro oltre il ponte: un filo d'acqua che prende il cielo, una riga bassa di
-    // alberi e case bianche, poi le colline. E' la cosa piu' lontana della veduta: la piu' velata, anche con il sereno.
-    // (Prima la riga di alberi era alta mezza arcata e scura: sotto il ponte sembrava una massa piena.)
-    float strip = 0.0026 + 0.0009 * vnoise(vec2(u * 14.0, 2.0));
-    if (y < 0.0006) { c = haze * 1.05; hz = 0.3; }
-    else if (y < strip) {
-      c = vec3(0.25, 0.30, 0.25) * (0.9 + 0.2 * vnoise(vec2(u * 40.0, 3.0)));
-      vec2 g = vec2(u / 0.035, (y - 0.0008) / 0.0011), f = fract(g);
-      float hk = fineK(0.035 * HWB * 0.55);
-      c = mix(c, vec3(0.72, 0.72, 0.69), mix(0.06, step(h21(floor(g) + 23.0), 0.22) * step(f.x, 0.55) * step(f.y, 0.7) * 0.75, hk));
-      hz = 0.56;
-    } else {
-      c = vec3(0.40, 0.46, 0.50) * (0.93 + 0.14 * vnoise(vec2(u * 5.0, y * 400.0)));
-      hz = 0.64;
-    }
+  if (isC(c, C_HILL)) col = vec3(0.007, 0.007, 0.009);
+  else if (isC(c, C_QUAY)) col = dark + warm * 0.30 * (0.12 + 0.88 * exp(-max(roof - h, 0.0) / 2.5)) * stone;   // schiarito dall'alto, dai lampioni
+  else if (isC(c, C_STONE)) col = dark + warm * 1.05 * (0.30 + 0.70 * exp(-max(h, 0.0) / 9.0)) * stone * (0.45 + 0.55 * cph * cph);   // il castello coi fari dal basso: piu' luce dove la pietra ci guarda
+  else if (isC(c, C_CHURCH)) col = dark + warm * 0.5 * (0.35 + 0.65 * exp(-max(h - 4.0, 0.0) / 12.0)) * stone;
+  else if (isC(c, C_STEEL)) col = vec3(0.015, 0.016, 0.021) + warm * (id < 2.0 ? 0.26 * exp(-max(h - 5.0, 0.0) / 3.5) : 0.05 * exp(-max(roof - h, 0.0) / 1.5));   // il Ponte Girevole: la travata illuminata da sotto
+  else if (isC(c, C_IND) || isC(c, C_TANK) || isC(c, C_CHIMNEY)) col = dark * 1.4;
+  else if (isC(c, C_GREEN)) col = vec3(0.006, 0.008, 0.007);
+  else if (c > 4.5 && fine) {
+    // case: finestre accese, calde o fredde, una su quattro circa (meno negli uffici e nei palazzoni)
+    float bay = isC(c, C_OLD) ? 3.1 : 3.8, fl = isC(c, C_OLD) ? 3.2 : 3.3;
+    float w = facadeWin(s, h, bay, fl, 0.4, 0.5, ps, ph, cell) * step(h, roof - 0.9);
+    float r = h21(cell + id * 7.13);
+    float lit = step(r, isC(c, C_TALL) ? 0.30 : 0.36);
+    vec3 lc = h21(cell + id * 3.7 + 3.0) < 0.72 ? vec3(1.0, 0.62, 0.30) : vec3(0.70, 0.80, 1.0);
+    col += lc * (0.28 + 0.42 * h21(cell + 7.7)) * w * lit;
+    if (isC(c, C_PALAZZO)) col += warm * 0.22 * exp(-max(h - 10.0, 0.0) / 6.0);
+    col += warm * 0.11 * exp(-max(h - 11.0, 0.0) / 6.0) * (1.0 - smoothstep(1500.0, 3800.0, d));   // i piani bassi sul lungomare, nella luce dei lampioni
   }
-  // la pietra sul pelo dell'acqua: una fascia bagnata, piu' scura e verdastra; piu' su, qualche colatura
-  if (fine && (isP(id, P_TOWER) || isP(id, P_STONE) || isP(id, P_CASTLE) || isP(id, P_QUAY))) {
-    c *= 1.0 - 0.10 * smoothstep(0.55, 0.85, vnoise(vec2(u * 45.0, y * 160.0)));
-    c = mix(c, c * vec3(0.55, 0.62, 0.52), 1.0 - smoothstep(0.0003, 0.0011, y));
-  }
-  // il sole vero, con il sereno: la faccia verso il sole si scalda, l'ombra prende l'azzurro del cielo.
-  // La normale: le torri tonde girano da -1 (sinistra) a 1 (destra), il resto guarda verso di noi.
-  if (SUNK > 0.0) {
-    float nx = isP(id, P_TOWER) ? p.y : isP(id, P_STONE) && p.w > 1.5 && p.w < 2.5 ? clamp((u + 5.67) / 0.53, -1.0, 1.0) : 0.0;
-    vec3 N = vec3(nx, 0.0, -sqrt(max(1.0 - nx * nx, 0.0)));
-    float ca = cos(uSun.z);
-    float lam = max(dot(N, vec3(uSun.x * ca, sin(uSun.z), uSun.y * ca)), 0.0);
-    if (isP(id, P_ROOF) || isP(id, P_GREEN)) lam = max(lam, 0.15 + 0.8 * sin(uSun.z));   // tetti e chiome lo prendono dall'alto
-    vec3 lit = vec3(0.52, 0.60, 0.78) * 0.75 + SUNCOL * lam * 1.2;
-    bool far = isP(id, P_SHORE);                                    // la riva lontana resta velata: c'e' il triplo d'aria in mezzo
-    c *= mix(vec3(1.0), lit, SUNK * (far ? 0.5 : 1.0));
-    hz = mix(hz, far ? hz * 0.85 : 0.17, SUNK);
-  }
-  return mix(c, haze, hz);
+  return mix(col, veil, (1.0 - exp(-d / 9000.0)) * 0.6);
 }
+
+// luce del giorno su una facciata: il sole vero col sereno ("dal vivo"), altrimenti la luce piatta del cielo.
+// nAz = dove guarda la facciata rispetto alla vetrata (0 = verso il fondo, la stessa direzione dello sguardo).
+vec3 dayLight(float nAz, float facing) {
+  float ca = cos(uSun.z), sAz = atan(uSun.x, uSun.y);
+  float lam = max(ca * cos(nAz - sAz), 0.0);
+  vec3 sun = vec3(0.52, 0.60, 0.78) * 0.5 + SUNCOL * lam * 0.78;     // al sole circa 0,85, in ombra 0,3: contrasto da giornata limpida
+  return mix(vec3(0.72 + 0.2 * facing), sun, SUNK);
+}
+// facciate di giorno: pietra del castello e dei muraglioni, intonaci della Citta' Vecchia e del Borgo, i palazzoni a
+// fasce di balconi, l'Ilva, i ponti. haze = il colore dell'aria verso l'orizzonte: vela secondo la distanza vera.
+vec3 panoDay(vec4 P, float roof, float az, float el, vec3 haze, bool fine) {
+  float c = P.x, phi = P.y, d = P.z, id = P.w;
+  float h = hAt(el, d), cph = max(cos(phi), 0.3);
+  float s = az * d / cph, ps = PIX * d / cph, ph = PIX * d / PK;
+  float n = fine ? vnoise(vec2(s * 0.8, h * 1.3)) : 0.5;
+  vec3 col = vec3(0.6);
+  vec2 cell;
+  float w = 0.0;
+  if (isC(c, C_HILL)) {
+    col = mix(vec3(0.16, 0.21, 0.15), vec3(0.31, 0.33, 0.26), vnoise(vec2(az * 240.0, el * 700.0)));
+    if (fine) col *= 0.85 + 0.3 * vnoise(vec2(az * 1300.0, el * 2600.0));
+  } else if (isC(c, C_GROUND)) col = vec3(0.42, 0.39, 0.33) * (0.9 + 0.2 * n);
+  else if (isC(c, C_QUAY)) {
+    col = SAND * 0.92 * (0.84 + 0.16 * (fine ? vnoise(vec2(s * 0.25, h * 1.6)) : 0.5));
+    col = mix(col, col * vec3(0.55, 0.62, 0.52), 1.0 - smoothstep(0.3, 1.2, h));                  // la pietra bagnata sul pelo dell'acqua
+    if (fine) col *= 1.0 - 0.12 * smoothstep(0.55, 0.85, vnoise(vec2(s * 0.6, h * 0.25)));     // colature
+    if (fine) col *= 1.0 - 0.06 * step(fract(h / 0.9), 0.13) * smoothstep(1.3, 3.5, 0.12 / ph);    // i corsi dei conci
+    col *= 1.0 + 0.08 * step(roof - 0.6, h);                                                       // la cimasa
+  } else if (isC(c, C_STONE)) {
+    col = SAND * (0.92 + 0.08 * n);
+    if (fine) {
+      col *= 1.0 - 0.05 * step(fract(h / 0.8), 0.14) * smoothstep(1.3, 3.5, 0.11 / ph);
+      col *= 1.0 - 0.28 * (1.0 - smoothstep(0.0, 0.5, abs(h - (roof - 6.5))));                    // il cordone
+      w = facadeWin(s, h, 9.0, 4.2, 0.12, 0.32, ps, ph, cell) * step(4.0, h) * step(h, roof - 2.0);
+      col = mix(col, vec3(0.12, 0.10, 0.08), w * step(0.55, h21(cell + id)) * 0.85);               // feritoie e finestrelle
+    }
+  } else if (isC(c, C_CHURCH)) {
+    col = vec3(0.66, 0.58, 0.46) * (0.92 + 0.08 * n);
+  } else if (isC(c, C_IND)) {
+    col = fract(id * 0.31) < 0.5 ? vec3(0.36, 0.35, 0.34) : vec3(0.42, 0.31, 0.23);
+    if (fine) col *= 1.0 - 0.10 * step(0.5, fract(s / 1.4)) * smoothstep(1.3, 3.5, 0.7 / ps);       // lamiera grecata
+  } else if (isC(c, C_CHIMNEY)) {
+    col = vec3(0.55, 0.54, 0.52);
+    float top = roof;                                                                               // bande rosse e bianche in cima
+    if (top > 80.0 && h > top - 0.35 * top) col = fract(h / 7.0) < 0.5 ? vec3(0.62, 0.10, 0.07) : vec3(0.86, 0.85, 0.82);
+  } else if (isC(c, C_STEEL)) {
+    col = id > 250.0 ? vec3(0.58, 0.57, 0.54) : id > 150.0 ? vec3(0.48, 0.47, 0.45) : id > 30.0 ? vec3(0.45, 0.46, 0.48) : vec3(0.10, 0.12, 0.15);
+  } else if (isC(c, C_GREEN)) col = vec3(0.10, 0.16, 0.08);
+  else if (isC(c, C_DARK)) col = vec3(0.05);
+  else if (isC(c, C_TANK)) col = vec3(0.74, 0.74, 0.72);
+  else {
+    // case: Citta' Vecchia, Borgo, palazzoni, il palazzo rosa
+    bool old = isC(c, C_OLD), tall = isC(c, C_TALL), pink = isC(c, C_PALAZZO);
+    col = (old ? palOld(id) : tall ? mix(vec3(0.78, 0.78, 0.75), vec3(0.70, 0.67, 0.60), fract(id * 0.29)) : pink ? vec3(0.62, 0.30, 0.25) : palRes(id)) * (0.93 + 0.07 * n);
+    float fl = old ? 3.2 : 3.3, bay = old ? 3.1 : tall ? 3.4 : 3.8;
+    if (fine) {
+      if (tall) {                                                                                  // le fasce dei balconi
+        float fy = fract(h / fl);
+        col = mix(col * 0.6, col * 1.05, mix(0.25, step(fy, 0.25), smoothstep(1.3, 3.5, fl * 0.25 / ph)));
+      } else col *= 1.0 - 0.07 * step(fract(h / fl), 0.1) * smoothstep(1.3, 3.5, fl * 0.1 / ph);   // i marcapiani
+      w = facadeWin(s, h, bay, fl, old ? 0.34 : 0.42, old ? 0.48 : 0.55, ps, ph, cell) * step(h, roof - 1.0);
+      float r = h21(cell + id * 1.31);
+      vec3 pane = vec3(0.16, 0.17, 0.19);
+      if (old || pink) pane = r < 0.22 ? vec3(0.20, 0.31, 0.22) : r < 0.34 ? vec3(0.36, 0.24, 0.16) : pane;   // persiane
+      else pane = mix(pane, col * 0.82 + 0.05, r < 0.3 ? 0.9 : r < 0.55 ? 0.45 : 0.0);                       // tapparelle
+      if (pink) col = mix(col, vec3(0.80, 0.75, 0.68), facadeWin(s, h, bay, fl, 0.56, 0.68, ps, ph, cell) * 0.6);   // cornici
+      col = mix(col, pane, w * 0.85);
+      col *= 1.0 + 0.07 * step(roof - 0.9, h);                                                    // il parapetto del terrazzo
+    }
+  }
+  // luce e aria
+  float nAz = az + PI - phi;
+  col *= (isC(c, C_HILL) || isC(c, C_QUAY)) ? mix(dayLight(PI, 1.0), dayLight(nAz, cph), 0.45) : dayLight(nAz, cph);   // muraglioni e colline: il chiaroscuro piu' dolce (la costa e' fatta di tanti tratti)
+  float hz = 1.0 - exp(-d / mix(30000.0, 8000.0, uCloud));          // col sereno l'aria e' limpida: la citta' a 1-2 km si vede netta
+  return mix(col, haze, clamp(0.03 + hz, 0.0, 0.93));
+}
+
+// auto sulle strade lungo l'acqua e sui ponti (strade.png): due corsie, una per verso, ogni auto un po' sopra il
+// parapetto. Di giorno piccole sagome colorate; di notte fari chiari davanti e luci rosse dietro. a = copertura.
+vec3 cars(float az, float el, float t, float night, out float a) {
+  a = 0.0;
+  vec3 acc = vec3(0.0);
+  float u = (az - PAZ0) / (PAZ1 - PAZ0);
+  if (u <= 0.0 || u >= 1.0) return acc;
+  for (int k = 0; k < 3; k++) {
+    vec4 r = textureLod(uStrade, vec2(u, (float(k) + 1.5) / 8.0), 0.0);
+    if (r.a < 0.002) continue;
+    float d = exp(LDMIN + r.a * LDR);
+    float y = (el - (PEL0 + r.b * (PEL1 - PEL0))) / PK * d;                      // metri sopra la strada
+    float py = PIX * d / PK;
+    if (y < 0.7 - py || y > 1.7 + py) continue;
+    float s = (r.r * 65280.0 + r.g * 255.0) * 0.25;
+    for (int l = 0; l < 2; l++) {
+      float dirn = l == 0 ? 1.0 : -1.0;
+      float x = s - dirn * t * 11.0 + float(k) * 37.0 + float(l) * 11.0;
+      float slot = floor(x / 23.0), lx = fract(x / 23.0) * 23.0;
+      if (h11(slot * 1.37 + float(l) * 7.1 + float(k) * 3.3) > 0.45) continue;
+      float body = (1.0 - smoothstep(4.2, 4.4, lx)) * smoothstep(0.85 - py, 0.85, y) * (1.0 - smoothstep(1.5, 1.5 + py, y));
+      float kind = h11(slot * 5.1 + float(l));
+      vec3 paint = kind < 0.3 ? vec3(0.85, 0.86, 0.87) : kind < 0.5 ? vec3(0.62, 0.12, 0.09) : kind < 0.75 ? vec3(0.12, 0.14, 0.18) : vec3(0.45, 0.46, 0.47);
+      float front = dirn > 0.0 ? lx : 4.3 - lx;                                 // 4.3 = il muso, 0 = la coda
+      float lamp = (1.0 - smoothstep(0.0, 0.55 + py, abs(y - 1.0))) * body;
+      vec3 lights = (vec3(1.0, 0.93, 0.78) * smoothstep(3.5, 4.2, front) * 1.6 + vec3(1.0, 0.08, 0.04) * (1.0 - smoothstep(0.1, 0.8, front)) * 0.9) * lamp;
+      acc += mix(paint * body, lights, night);
+      a = max(a, body * (1.0 - night * 0.6));
+    }
+  }
+  return acc;
+}
+
+// le luci della notte: lampioni, porto, Ilva, luci rosse in cima a ciminiere e torri (quelle lampeggiano: le riconosce
+// il rosso pieno, e il blu ne da' la fase). Un alone dalla mipmap, piu' largo quando il vetro e' bagnato.
+vec3 nightLights(vec2 uv, float blur, float t) {
+  vec3 l0 = textureLod(uLuci, uv, 0.0).rgb;
+  vec3 l1 = textureLod(uLuci, uv, 2.2 + blur * 2.2).rgb;
+  vec3 l2 = textureLod(uLuci, uv, 4.0 + blur * 1.5).rgb;
+  float red = step(0.2, l0.r) * step(l0.g, 0.03);
+  float ph = fract(t * 0.45 + l0.b * 3.1);
+  float blink = smoothstep(0.0, 0.08, ph) * (1.0 - smoothstep(0.42, 0.52, ph));
+  float flick = 0.92 + 0.08 * sin(t * 3.0 + uv.x * 900.0);
+  return (l0 * 1.5 + l1 * 3.2 + l2 * 2.5) * mix(flick, blink * 1.6, red);
+}
+
+vec3 water(float az, float el, float blur, float t) {
+  float dep = max(HOR - el, 0.0004);               // depressione sotto l'orizzonte
+  vec2 wp = vec2(az / dep, 1.0 / dep);             // coordinate sul piano dell'acqua
+  // il vento cambia le onde: con la calma poche increspature, larghe e lente; con il vento fitte, alte e svelte
+  float tw = uWaveT, rf = wm(0.55, 1.0, 1.7), rh = wm(0.3, 1.0, 1.7);
+  float big = fbm3(vec2(wp.x * 0.9 * rf, wp.y * 0.55 * rf - tw * 0.35));
+  float rip = (big - 0.5) * rh;
+  float wobA = wm(0.6, 1.0, 2.6), wobF = wm(0.6, 1.0, 2.2);    // quanto e quanto in fretta il riflesso trema di lato
+  float gap = wm(0.8, 1.0, 0.8);
+  float bLo = wm(0.0, 0.38, 0.52), bHi = wm(0.55, 0.75, 0.82), bF = wm(0.6, 1.0, 2.4);   // soglie e frequenza delle rotture
+  float lenK = wm(1.5, 1.0, 0.6);                              // lunghezza dei riflessi: lunghi con la calma, corti con il vento
+  float fres = 0.04 + 0.96 * pow(1.0 - smoothstep(0.0, 0.35, dep), 5.0);
+  vec3 col = vec3(0.004, 0.007, 0.012);
+  col += sky(az + rip * dep * 0.6, HOR + dep * 0.9 + rip * 0.01, t) * (0.35 + 0.5 * fres);
+  // la riva specchiata: le luci si allungano in strisce tremolanti e spezzate, la pietra illuminata si rovescia
+  float eb = shoreEl(az), below = eb - el;
+  if (below > 0.0 && az > PAZ0 && az < PAZ1) {
+    float wob = (vnoise(vec2(wp.y * 0.35 * wobF, tw * 1.3)) - 0.5) * dep * 0.07 * wobA;
+    float brk = smoothstep(bLo, bHi, vnoise(vec2(az * 700.0, wp.y * 0.45 * bF - tw * 1.8)));
+    vec2 us = puv(az + wob, eb + below * 0.16 / lenK);
+    col += nightLights(us, blur + 0.6, t) * brk * 0.55 * exp(-below / (0.06 * lenK)) * gap;
+    vec2 um = puv(az + wob, eb + below);
+    if (inPano(um)) {
+      float rr; vec4 q = pano(um, rr);
+      if (q.x > 0.5) col = mix(col, panoNight(q, rr, az, eb + below, col, false), textureLod(uLuci, um, 0.0).a * 0.55 * (0.4 + 0.6 * brk) * exp(-below / 0.03));
+    }
+  }
+  if (uMoon.w > 0.0) {                                           // la scia della Luna sull'acqua
+    float mx = (az - uMoon.x) / ((0.012 + dep * 0.45) * wm(0.6, 1.0, 1.6));
+    float glit = smoothstep(wm(0.0, 0.35, 0.55), wm(0.4, 0.8, 0.9), vnoise(vec2(wp.x * 2.0 * wm(0.7, 1.0, 2.2), wp.y * 0.6 * wm(0.7, 1.0, 1.9) - tw * 1.2)));
+    col += vec3(0.55, 0.58, 0.62) * exp(-mx * mx) * glit * uMoon.z * (1.0 - smoothstep(0.15, 0.75, uCloud)) * 0.35 * wm(1.4, 1.0, 0.9) * exp(-dep / (0.25 * wm(1.4, 1.0, 0.8)));
+  }
+  return col;
+}
+
+vec3 outside(vec3 dir, float blur, float t) {
+  float az = atan(dir.x, -dir.z);
+  float el = asin(clamp(dir.y, -1.0, 1.0));
+  vec3 col = el < HOR ? water(az, el, blur, t) + boatNight(az, el, blur, t) : sky(az, el, t);
+  vec2 uv = puv(az, el);
+  if (inPano(uv)) {
+    float roof; vec4 P = pano(uv, roof);
+    float cov = textureLod(uLuci, uv, blur * 1.5).a;
+    if (P.x > 0.5) {
+      vec3 veil = vec3(0.030, 0.024, 0.034) + vec3(0.075, 0.034, 0.05) * 0.6;
+      col = mix(col, panoNight(P, roof, az, el, veil, true), cov);
+      // sulle colline lontane, qualche luce sparsa: case, strade, paesi
+      if (isC(P.x, C_HILL)) {
+        vec2 gc = vec2(az / 0.004, el / 0.0016), gi = floor(gc), f = fract(gc) - 0.5 - (h22(gi + 31.0) - 0.5) * 0.6;
+        float hs = h21(gi + 31.0);
+        col += (hs < 0.03 ? COLD : SODIUM) * step(hs, 0.12) * exp(-dot(f, f) * 18.0) * 0.35 * cov;
+      }
+    }
+    col += nightLights(uv, blur, t);
+    float ca; vec3 cc = cars(az, el, t, 1.0, ca);
+    col += cc;
+  }
+  // foschia sul pelo dell'acqua
+  col += vec3(0.05, 0.04, 0.035) * exp(-abs(el - HOR) / 0.006) * 0.5;
+  return col;
+}
+
+
 vec3 dayOutside(vec3 dir, float blur, float t) {
   float az = atan(dir.x, -dir.z);
   float el = asin(clamp(dir.y, -1.0, 1.0));
   vec3 col = vec3(0.0);
   sunSetup();
+  vec3 haze = daySky(az, HOR + 0.02, t);
   if (el < HOR) {
     float dep = max(HOR - el, 0.0004);
     vec2 wp = vec2(az / dep, 1.0 / dep);
@@ -886,33 +597,30 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float refl = 0.25 + 0.25 * (1.0 - uCloud) + wm(0.22, 0.0, -0.1);
     refl = mix(refl, mix(0.75, 0.12, smoothstep(0.0, 0.2, dep)) + wm(0.12, 0.0, -0.05), clr);   // al sereno: Fresnel, specchio solo verso l'orizzonte
     // le onde inclinano lo specchio: al sereno l'acqua riflette il cielo piu' alto, piu' blu, non solo il chiarore dell'orizzonte
-    col = mix(col, daySky(az, HOR + mix(dep, dep * 2.5 + 0.06, clr), t), clamp(refl, 0.0, 1.0));   // con il sereno l'acqua prende l'azzurro del cielo; con la calma ne e' lo specchio
+    col = mix(col, daySky(az, HOR + mix(dep, dep * 2.5 + 0.06, clr), t), clamp(refl, 0.0, 1.0));
     // da vicino si vedono le increspature piccole sopra l'onda lunga
     col *= 1.0 + (vnoise(vec2(wp.x * 3.1, wp.y * 2.2 - tw * 1.1)) - 0.5) * 0.16 * smoothstep(0.04, 0.25, dep) * wm(0.5, 1.0, 1.3);
-    // Il ponte capovolto nell'acqua: la stessa sagoma (arcata, impalcato, spalle) specchiata sotto la linea di riva,
-    // mossa dalle onde e sempre piu' sbiadita e rotta allontanandosi. Prima era una fascia scura dai bordi netti.
-    float u = townU(az) + rip * (0.03 + dep * 3.0);
-    // creste bianche, rade e piccole verso il largo: solo con vento forte, dove l'onda grossa e' alta e una seconda grana e' accesa
+    // creste bianche, rade e piccole verso il largo: solo con vento forte
     float ws = clamp(uWind * 2.0 - 1.0, 0.0, 1.0);
     if (ws > 0.0) {
       float fine = vnoise(vec2(wp.x * 2.6, wp.y * 1.5 - tw * 0.9));
       float far = smoothstep(0.012, 0.05, dep) * (1.0 - 0.5 * smoothstep(0.1, 0.25, dep));
-      float swell = vnoise(vec2(wp.x * 0.3, wp.y * 1.2 - tw * 0.6));          // lunghe ondulazioni: bande scure e chiare di traverso
+      float swell = vnoise(vec2(wp.x * 0.3, wp.y * 1.2 - tw * 0.6));
       col *= 1.0 - 0.22 * ws * (swell - 0.4) * far;
-      col += vec3(0.07, 0.09, 0.10) * ws * smoothstep(0.50, 0.68, big) * far;   // il fianco dell'onda rivolto al cielo si schiarisce
-      float cap = smoothstep(0.57, 0.70, big) * smoothstep(0.60, 0.80, fine) * far;
-      col = mix(col, vec3(0.82, 0.87, 0.90), cap * 0.7 * ws);
+      col += vec3(0.07, 0.09, 0.10) * ws * smoothstep(0.50, 0.68, big) * far;
+      col = mix(col, vec3(0.82, 0.87, 0.90), smoothstep(0.57, 0.70, big) * smoothstep(0.60, 0.80, fine) * far * 0.7 * ws);
     }
-    if (u > BR_L - 0.2 && u < BR_R + 0.2) {
-      float ry = dep * 1.1 / VS;
-      float brk = 0.5 + 0.5 * smoothstep(0.3, 0.7, fbm3(vec2(wp.x * 2.3 * rf, wp.y * 1.4 * rf - tw * 0.5)));
-      brk = mix(brk, 1.0, 0.6 * clamp(1.0 - uWind * 2.0, 0.0, 1.0));       // con la calma il ponte si specchia quasi intero
-      float yb = bridgeUnder(u);
-      vec3 steel = mix(mix(vec3(0.12, 0.16, 0.20), vec3(0.26, 0.33, 0.38), smoothstep(yb, DECK, ry)), daySky(az, HOR + 0.02, t), 0.3);
-      col = mix(col, steel * 0.78, bridgeMask(u, ry, 0.0014 + dep * 0.06) * brk * 0.85 * exp(-dep / 0.09));
+    // la riva specchiata, mossa dalle onde e sempre piu' sbiadita e rotta allontanandosi dalla base
+    float eb = shoreEl(az), below = eb - el;
+    if (below > 0.0 && az > PAZ0 && az < PAZ1) {
+      vec2 um = puv(az + rip * dep * 0.05, eb + below + rip * 0.0015);
+      if (inPano(um)) {
+        float rr; vec4 q = pano(um, rr);
+        float brk = 0.5 + 0.5 * smoothstep(0.3, 0.7, fbm3(vec2(wp.x * 2.3 * rf, wp.y * 1.4 * rf - tw * 0.5)));
+        brk = mix(brk, 1.0, 0.6 * clamp(1.0 - uWind * 2.0, 0.0, 1.0));       // con la calma la riva si specchia quasi intera
+        if (q.x > 0.5) col = mix(col, panoDay(q, rr, az, eb + below, col, false) * 0.8, textureLod(uLuci, um, 0.0).a * 0.42 * brk * exp(-below / 0.025));
+      }
     }
-    // la citta' specchiata: la pietra del castello e del muraglione, sbiadita e mossa
-    if (u > -7.0 && u < 7.0 && dep < 0.1 && (u < -1.03 || u > 1.0)) col = mix(col, townDay(u, dep * 1.05 / VS, col, false), 0.2 * exp(-dep / 0.02));
     // la barca: scafo chiaro, cabina e una scia corta
     float ba = boatAz(t);
     float hull = (1.0 - smoothstep(0.0062, 0.0074, abs(az - ba))) * (1.0 - smoothstep(0.0009, 0.0013, abs(el - BOAT_EL - 0.0008)));
@@ -926,84 +634,29 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
       float mx = (az - SUN_AZ) / (0.012 + dep * 0.5);
       col += SUNCOL * exp(-mx * mx) * smoothstep(0.48, 0.72, big) * front * 0.9 * exp(-dep / 0.12);
     }
-  } else {
-    float u = townU(az), y = (el - HOR) / VS;   // y: quota sopra l'acqua, nella scala della citta'
-    float ce = skyline(az);
-    float edge = 0.0012 + blur * 0.002;
-    float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
-    vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR)) * (1.0 + 0.22 * (1.0 - uCloud));
-    if (land > 0.0 && townK(u) < 0.999) {
-      // le colline lontane: macchia a chiazze, i versanti girati verso il sole un po' piu' chiari e, al piede, i paesi bianchi
-      float hy = el - HOR;
-      hill *= 0.82 + 0.36 * fbm3(vec2(az * 70.0, hy * 260.0));
-      hill *= 1.0 - 0.12 * smoothstep(0.6, 0.8, vnoise(vec2(az * 140.0, hy * 600.0)));              // filari e boschetti piu' scuri
-      float nx = clamp(-(coast(az + 0.003) - coast(az)) / 0.003 * 3.0, -1.0, 1.0);            // da che parte guarda il versante
-      hill *= 1.0 + nx * uSun.x * 0.22 * SUNK + 0.05 * abs(nx) * (1.0 - SUNK);
-      // le case: sparse e storte dentro la loro cella, larghe ognuna a modo suo; i paesi a grappoli salgono un po' sui versanti
-      vec2 g = vec2(az / 0.0032, hy / 0.0018), gi = floor(g), f = fract(g) - 0.5, jit = h22(gi + 61.0) - 0.5;
-      float bw = 0.2 + 0.2 * h21(gi + 7.0);
-      float one = step(h21(gi + 61.0), 0.45) * step(abs(f.x - jit.x * 0.4), bw) * step(abs(f.y - jit.y * 0.3), 0.22);
-      float house = mix(0.12, one, fineK(0.0032 * 0.5));
-      float place = smoothstep(0.5, 0.75, vnoise(vec2(az * 30.0, 1.0))) * (1.0 - smoothstep(0.003, 0.02 * (0.4 + vnoise(vec2(az * 12.0, 4.0))), hy));
-      hill = mix(hill, vec3(0.66, 0.66, 0.63) * (1.0 + 0.4 * SUNK), house * place * 0.65);
-    }
-    vec3 haze = daySky(az, HOR + 0.02, t);
-    float yc = min(y, (ce - HOR) / VS - 0.0002);                 // sul bordo del profilo il colore e' quello dell'elemento sotto
-    if (inTown(u)) hill = mix(hill, townDay(u, yc, haze, true), townK(u));   // velati dalla distanza
-    col = mix(daySky(az, el, t), hill, land);
-    if (u > -2.2 && u < 7.0) {                                   // l'antenna e la bandiera sul castello, le palme sul muraglione
-      float e2 = edge * 0.5 / DIST;
-      col = mix(col, mix(vec3(0.42, 0.44, 0.46), haze, 0.3), mast(u, y, e2));
-      float fx = (u - MAST_U - 0.105) / 0.065, fy = y - 0.0447 + 0.0006 * sin(fx * 4.0 + t * 2.0);
-      float flag = step(0.0, fx) * step(fx, 1.0) * step(abs(fy), 0.0022);
-      vec3 tri = fx < 0.333 ? vec3(0.10, 0.50, 0.25) : fx < 0.667 ? vec3(0.92, 0.92, 0.90) : vec3(0.80, 0.14, 0.16);
-      col = mix(col, mix(tri, haze, 0.4), flag);
-      col = mix(col, mix(vec3(0.70, 0.70, 0.70), haze, 0.4), (1.0 - smoothstep(0.0, e2, abs(u - MAST_U - 0.105) * HW0 - 0.0001)) * step(TW_TOP, y) * step(y, 0.0475));
-      float pm = max(palm(u, y, 6.3, 0.049, e2), palm(u, y, 6.85, 0.046, e2));
-      col = mix(col, mix(vec3(0.10, 0.15, 0.08), haze, 0.35), pm);
-    }
-    if (u > BR_L - 0.1 && u < BR_R + 0.1) {                      // ponte girevole: acciaio scuro, travata, parapetto e lampioni
-      float be = (0.0005 + blur * 0.0010) / DIST;                 // in quote della citta': da lontano i bordi sono piu' morbidi
-      float yb = bridgeUnder(u);
-      vec3 steel = mix(vec3(0.06, 0.07, 0.09), vec3(0.16, 0.19, 0.22), smoothstep(DECK - 0.0018, DECK, y));
-      steel = mix(steel, haze, 0.38);
-      col = mix(col, mix(steel, col, 0.75 * trussGap(u, y)), bridgeMask(u, y, be));
-      float inB = step(BR_L, u) * step(u, BR_R);
-      float bars = 0.35 + 0.65 * step(fract(u / 0.045), 0.3);                                     // la grata: sbarre fitte
-      float rail = max(1.0 - smoothstep(0.0, 0.00025 + be, abs(y - RAIL)), 0.32 * bars * step(DECK, y) * step(y, RAIL));   // corrimano e grata
-      col = mix(col, mix(vec3(0.08, 0.09, 0.11), haze, 0.38), rail * inB * 0.8);
-      for (int i = 0; i < LAMPS; i++) {
-        float d = abs(u - lampU(i));
-        float post = (1.0 - smoothstep(0.0, be, d * HW0 - 0.00012)) * step(RAIL, y) * step(y, LAMP_Y + 0.0007);
-        float arm = step(d, 0.06) * (1.0 - smoothstep(0.0, be, abs(y - LAMP_Y - 0.0004) - 0.00015));
-        float head = (1.0 - smoothstep(0.0, be, length(vec2((d - 0.05) * HW0, y - LAMP_Y)) - 0.00035));
-        col = mix(col, mix(vec3(0.14, 0.16, 0.19), haze, 0.38), max(post, max(arm, head)) * 0.8);
-      }
-    }
-    if (u > -1.1 && u < 6.5 && y < 0.03) {                               // auto di giorno: piccole sagome colorate
-      for (int i = 0; i < CARS; i++) {
-        vec3 c = carAt(i, t);
-        float body = (1.0 - smoothstep(0.045, 0.060, abs(u - c.x))) * (1.0 - smoothstep(0.0007, 0.0012, abs(y - roadY(c.x) - 0.0005)));
-        float kind = mod(float(i), 3.0);
-        vec3 paint = kind < 0.5 ? vec3(0.72, 0.16, 0.12) : kind < 1.5 ? vec3(0.88, 0.89, 0.90) : vec3(0.16, 0.20, 0.26);
-        col = mix(col, mix(paint, haze, 0.4), body * c.y * 0.8);
-      }
-    }
-    // tre gabbiani planano piano sopra l'acqua, con le ali ad M; ogni tanto le battono
-    for (int i = 0; i < 3; i++) {
-      float fi = float(i);
-      float ph = fract(t * (0.0045 + 0.0015 * fi) + fi * 0.37);
-      // bassi, davanti alla citta' e alle colline: sopra, nella vista d'insieme, c'e' subito la barra del sito
-      vec2 g0 = vec2(mix(-0.7, 0.7, ph), HOR + 0.012 + 0.011 * fi + 0.004 * sin(t * 0.21 + fi * 2.0));
-      float s = 0.0065 - 0.0012 * fi;                                  // mezza apertura alare, in radianti
-      vec2 q = (vec2(az, el) - g0) / s;
-      float ax = abs(q.x);
-      if (ax < 1.0 && abs(q.y) < 1.0) {
-        float flap = sin(t * 8.0 + fi * 3.0) * smoothstep(0.6, 0.8, sin(t * 0.45 + fi * 1.7));
-        float wy = (1.0 + 0.8 * flap) * (0.6 * sqrt(ax) - 0.62 * ax);
-        float a = (1.0 - smoothstep(0.5 * PIX, 1.5 * PIX, abs(q.y - wy) * s)) * (1.0 - smoothstep(0.85, 1.0, ax));
-        col = mix(col, mix(vec3(0.30, 0.32, 0.35), vec3(0.88, 0.89, 0.88), land), a * 0.85);
-      }
+  } else col = daySky(az, el, t);
+  vec2 uv = puv(az, el);
+  float land = 0.0;
+  if (inPano(uv)) {
+    float roof; vec4 P = pano(uv, roof);
+    float cov = textureLod(uLuci, uv, blur * 1.5).a;
+    if (P.x > 0.5) { col = mix(col, panoDay(P, roof, az, el, haze, true), cov); land = cov; }
+    float ca; vec3 cc = cars(az, el, t, 0.0, ca);
+    col = mix(col, mix(cc, haze, 0.25), ca);
+  }
+  // tre gabbiani planano piano sopra l'acqua, con le ali ad M; ogni tanto le battono
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float ph = fract(t * (0.0045 + 0.0015 * fi) + fi * 0.37);
+    vec2 g0 = vec2(mix(-0.7, 0.7, ph), HOR + 0.010 + 0.009 * fi + 0.004 * sin(t * 0.21 + fi * 2.0));
+    float s = 0.0065 - 0.0012 * fi;
+    vec2 q = (vec2(az, el) - g0) / s;
+    float ax = abs(q.x);
+    if (ax < 1.0 && abs(q.y) < 1.0) {
+      float flap = sin(t * 8.0 + fi * 3.0) * smoothstep(0.6, 0.8, sin(t * 0.45 + fi * 1.7));
+      float wy = (1.0 + 0.8 * flap) * (0.6 * sqrt(ax) - 0.62 * ax);
+      float a = (1.0 - smoothstep(0.5 * PIX, 1.5 * PIX, abs(q.y - wy) * s)) * (1.0 - smoothstep(0.85, 1.0, ax));
+      col = mix(col, mix(vec3(0.30, 0.32, 0.35), vec3(0.88, 0.89, 0.88), land), a * 0.85);
     }
   }
   return clearFilter(col, az, el);
@@ -1106,7 +759,23 @@ export function createGlass() {
   // uso bloccava la pagina per 7-8 secondi (compilazione), e prepararla prima con compileAsync non serviva.
   // cielo vero ("dal vivo"): le stelle si disegnano su questa tela (room.setHeavens) e lo shader le legge come texture
   const skyCanvas = canvas(1536, 768), skyTex = tex(skyCanvas, { mips: false });
-  const shared = { uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 }, uWind: { value: 0.5 }, uWaveT: { value: 0 }, uSun: { value: new THREE.Vector4(0, 0, 0, 0) } };
+  // il panorama vero di Taranto (tools/panorama.py): tre immagini di dati, non di colori. Si leggono senza
+  // premoltiplicare l'alfa (che porta dati anche lui) e senza conversioni di colore; quella delle luci con le mipmap
+  // (gli aloni), le altre "nearest" (classi e distanze non si possono mediare).
+  const loader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: "flipY", premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const dataTex = (name, smooth) => new Promise((resolve, reject) => loader.load(new URL("./taranto/" + name, import.meta.url).href, (img) => {
+    const t = new THREE.Texture(img);
+    t.flipY = false; t.premultiplyAlpha = false; t.colorSpace = THREE.NoColorSpace;
+    t.magFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
+    t.minFilter = smooth ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
+    t.generateMipmaps = smooth;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.needsUpdate = true;
+    resolve(t);
+  }, undefined, reject));
+  const empty = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+  empty.needsUpdate = true;
+  const shared = { uPano: { value: empty }, uLuci: { value: empty }, uStrade: { value: empty }, uStars: { value: skyTex }, uStarAmt: { value: 0 }, uMoon: { value: new THREE.Vector4(0, 0, 0, 0) }, uMoonDir: { value: new THREE.Vector2(1, 0) }, uTime: { value: 0 }, uSize: { value: new THREE.Vector2(w, h) }, uRain: { value: 1 }, uDay: { value: 0 }, uCloud: { value: 0.66 }, uDusk: { value: 0 }, uWind: { value: 0.5 }, uWaveT: { value: 0 }, uSun: { value: new THREE.Vector4(0, 0, 0, 0) } };
   const material = (MODE) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms: { ...shared, uAlpha: { value: 1 } }, defines: { MODE }, transparent: true });
   const variants = [0, 1].map(material);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), variants[0]);
@@ -1120,14 +789,16 @@ export function createGlass() {
   mesh.add(over);
   mesh.userData.over = over;
   mesh.userData.sky = { canvas: skyCanvas, ctx: skyCanvas.getContext("2d"), texture: skyTex, uniforms: shared };
+  mesh.userData.ready = Promise.all([dataTex("pano.png", false), dataTex("luci.png", true), dataTex("strade.png", false)])
+    .then(([p, l, st]) => { shared.uPano.value = p; shared.uLuci.value = l; shared.uStrade.value = st; });
   mesh.position.set((ROOM.win.x0 + ROOM.win.x1) / 2, (ROOM.win.y0 + ROOM.win.y1) / 2, ROOM.glassZ);
   mesh.name = "glass";
   return mesh;
 }
 
-// direzione vera (gradi da nord) in cui si guarda la citta' dal Mar Grande, lungo il canale verso il Mar Piccolo.
-// Serve solo alla luce del sole sulle facciate; il cielo della vetrata (stelle, Luna) segue FACING in sky.js.
-const CITY_BEARING = 45;
+// la direzione vera (gradi da nord) della normale della vetrata: dal Mar Grande quasi verso nord, con il canale un
+// po' a destra (tools/panorama.py). Serve alla luce del sole sulle facciate; stelle e Luna la seguono in sky.js.
+const CITY_BEARING = PANO.BEARING;
 const C3 = (hex) => new THREE.Color(hex);
 const NIGHT = { moon: C3(0x5f86d8), sky: C3(0x2c3466), ground: C3(0x0b0710), floor: C3(0x31261f), ceil: C3(0x1d2026) };
 const DAY = { moon: C3(0xfff3e2), sky: C3(0xd5dee8), ground: C3(0x8f887b), floor: C3(0xd9d0c6), ceil: C3(0xc4c9cc) };
@@ -1328,15 +999,8 @@ void main() {
       const fit = (text, size, weight, max) => { let s = size + 4; do { s -= 4; x.font = `${weight} ${s}px ${FONT}`; } while (x.measureText(text).width > max && s > 26); };
       x.textBaseline = "alphabetic";
       x.lineCap = x.lineJoin = "round";
-      // di giorno un vetro smerigliato chiaro dietro le scritte: si leggono come un display sul vetro, non come un adesivo
-      if (!N) {
-        const r = 12, x0 = 26, y0 = 8, x1 = W - 26, y1 = H - 6;
-        x.beginPath(); x.moveTo(x0 + r, y0);
-        x.arcTo(x1, y0, x1, y1, r); x.arcTo(x1, y1, x0, y1, r); x.arcTo(x0, y1, x0, y0, r); x.arcTo(x0, y0, x1, y0, r);
-        x.closePath();
-        x.fillStyle = "rgba(238, 241, 236, 0.52)"; x.fill();
-      }
-      // gli angoli del riquadro, come in un mirino
+      // niente sfondo, neanche di giorno: le scritte stanno direttamente sul vetro (un vetro smerigliato chiaro
+      // dietro, provato il 2026-11-23, a Luigi non piaceva). Gli angoli del riquadro, come in un mirino
       x.shadowBlur = 0;
       x.strokeStyle = N ? "rgba(255, 180, 74, 0.6)" : "rgba(122, 62, 0, 0.6)"; x.lineWidth = 4;
       x.beginPath();
@@ -1473,6 +1137,7 @@ void main() {
   return {
     group,
     glass,
+    ready: glass.userData.ready,   // il panorama vero e' arrivato (le sue immagini si caricano a parte)
     poster,   // si clicca: apre il catalogo delle macchine sonore (main.js)
     // day: 0 = notte, 1 = giorno (di giorno entra luce chiara dalla vetrata e le pareti schiariscono).
     // rain: 0 vetro asciutto .. 1 pioggia. cloud: 0 sereno .. 1 coperto. warm: 0..1, alba e tramonto.
@@ -1526,7 +1191,7 @@ void main() {
       const u = glass.material.uniforms;
       u.uDay.value = k; u.uRain.value = rain; u.uCloud.value = cloud; u.uDusk.value = twilight ? warm : 0;
       // il sole vero sulla veduta ("dal vivo"): da dove arriva rispetto a chi guarda la citta'. La veduta e' quella di
-      // Taranto dal Mar Grande, verso nord-est (CITY_BEARING): il sole si calcola li', qualunque sia il posto del visitatore.
+      // Taranto dal Mar Grande, verso nord (CITY_BEARING): il sole si calcola li', qualunque sia il posto del visitatore.
       // Nei temi fissi non c'e' (date null) e lo shader resta quello di sempre.
       const sun = date ? heavens(date, 40.47, 17.24).sun : null;
       if (sun) { const r = (sun.bearing - CITY_BEARING) * Math.PI / 180; u.uSun.value.set(Math.sin(r), Math.cos(r), sun.alt, 1); }

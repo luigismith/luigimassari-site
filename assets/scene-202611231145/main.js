@@ -472,6 +472,7 @@ export async function start({ data, root, force, trusted, toLofi }) {
 
   resize();
   new ResizeObserver(resize).observe(holder);
+  await room.ready;   // il panorama vero di Taranto: tre immagini piccole, di solito gia' arrivate
   ui.progress(0.27);
   await nextFrame();
 
