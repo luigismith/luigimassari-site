@@ -137,7 +137,9 @@ export class UI {
       ? s.hours.map((x) => ({ temp: x.temp, mm: x.mm, label: new Date(x.time).toLocaleTimeString(lang, { hour: "2-digit", hourCycle: "h23", ...zone }).replace(/\D/g, "") }))
       : null;
     const place = (here ? u.live_at_you : u.live_at_taranto).replace("{time}", time) + (s.weather === "none" ? ". " + u.live_light : "");
-    return { text: main + ". " + sub, lines: { big: temp, main: kind, sub: place, credit: s.weather === "none" ? "" : u.live_credit, hours } };
+    // sul vetro la temperatura e' solo "18°", accanto all'icona del tempo; il vento in metri al secondo, se c'e'
+    const big = ok && s.temp !== null ? s.temp + "°" : "", wind = ok && typeof s.windMs === "number" ? Math.round(s.windMs) + " m/s" : "";
+    return { text: main + ". " + sub, lines: { big, main: kind, sub: place, credit: s.weather === "none" ? "" : u.live_credit, icon: ok ? s.kind : null, wind, hours } };
   }
 
   setSound(on) {

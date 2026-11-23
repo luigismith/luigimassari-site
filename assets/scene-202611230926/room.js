@@ -609,7 +609,7 @@ vec3 townNight(float u, float y) {
   } else if (isP(id, P_SHORE)) {                                   // la riva del Mar Piccolo: buia, con qualche luce lontana
     c = vec3(0.014, 0.012, 0.018);
     vec2 g = vec2(u / 0.06, y / 0.0022), f = fract(g) - 0.5, gi = floor(g);
-    if (y < 0.0066 && h21(gi + 51.0) < 0.16) c += SODIUM * (1.0 - smoothstep(0.12, 0.3, length(f * vec2(1.0, 0.5)))) * 0.45;
+    if (y < 0.0032 && h21(gi + 51.0) < 0.16) c += SODIUM * (1.0 - smoothstep(0.12, 0.3, length(f * vec2(1.0, 0.5)))) * 0.45;
   }
   return c;
 }
@@ -744,7 +744,9 @@ vec3 clearFilter(vec3 col, float az, float el) {
 // facciate di giorno, con la luce piatta del coperto: la pietra color sabbia del castello e del muraglione, il palazzo
 // rosa, i palazzoni chiari a fasce di balconi. haze = il colore della foschia, che vela tutto (la riva lontana di piu').
 const vec3 SAND = vec3(0.47, 0.32, 0.17);   // colori lineari: a schermo escono piu' chiari
-vec3 townDay(float u, float y, vec3 haze) {
+// fine: i dettagli piccoli (conci, cannoniere, tapparelle, persiane, fiancate, pietra bagnata). Il riflesso nell'acqua
+// la chiama con false: li' non si vedrebbero, e con una costante il compilatore li toglie da quella copia della funzione.
+vec3 townDay(float u, float y, vec3 haze, bool fine) {
   vec4 p = townPart(u, y);
   float id = p.x, n = vnoise(vec2(u * 60.0, y * 1400.0));
   vec3 c = vec3(0.6);
@@ -765,8 +767,13 @@ vec3 townDay(float u, float y, vec3 haze) {
     }
   } else if (isP(id, P_CASTLE)) {
     c = SAND * (p.w < 0.5 ? 1.0 : 0.94) * (0.92 + 0.08 * n);
+    if (fine) c *= 1.0 - 0.06 * step(fract(y / 0.0013), 0.14) * fineK(0.0013 * VS * 0.14);      // i corsi dei conci
     float w = winGrid(p.y, y, 0.30, 0.0058, 0.0255, 0.17, 0.25, cell);
     c = mix(c, vec3(0.12, 0.10, 0.08), w * step(0.3, h21(cell + p.w * 9.0)) * 0.85);
+    if (fine) {                                                                                     // le cannoniere sotto il coronamento
+      float cn = step(abs(fract(p.y / 0.22 + 0.5) - 0.5), 0.08) * step(abs(y - 0.0378), 0.0007);
+      c = mix(c, vec3(0.10, 0.08, 0.07), cn * mix(0.3, 0.85, fineK(0.0014 * VS)));
+    }
   } else if (isP(id, P_ROOF)) {
     c = u < 0.0 ? vec3(0.30, 0.19, 0.13) : vec3(0.42, 0.17, 0.12);
   } else if (isP(id, P_QUAY)) {
@@ -790,28 +797,59 @@ vec3 townDay(float u, float y, vec3 haze) {
     c = mix(c, vec3(0.14, 0.11, 0.12), w);
     c = mix(c, vec3(0.78, 0.72, 0.64), step(0.0440, y) + step(abs(y - 0.0240), 0.0005) + step(lu, 0.07) + step(2.03, lu));   // cornicione, marcapiano, paraste d'angolo
   } else if (isP(id, P_HOUSE)) {
-    c = mix(vec3(0.62, 0.53, 0.40), vec3(0.55, 0.52, 0.47), p.w);
+    // le case basse: bianco calce, ocra, rosa antico, grigio pietra
+    c = p.w < 0.25 ? vec3(0.68, 0.64, 0.57) : p.w < 0.5 ? vec3(0.64, 0.50, 0.34) : p.w < 0.75 ? vec3(0.63, 0.46, 0.41) : vec3(0.56, 0.53, 0.47);
     float w = winGrid(u, y, 0.14, 0.0058, u < 0.0 ? 0.004 : 0.017, 0.45, 0.5, cell);
-    c = mix(c, vec3(0.16, 0.15, 0.15), w * 0.8);
+    // le persiane: verdi o marroni, chiuse in una finestra su tre; le altre aperte sul vetro scuro
+    vec3 pane = vec3(0.16, 0.15, 0.15);
+    if (fine) { float r = h21(cell + p.w * 13.0 + 5.0); pane = r < 0.2 ? vec3(0.20, 0.31, 0.22) : r < 0.32 ? vec3(0.36, 0.24, 0.16) : pane; }
+    c = mix(c, pane, w * 0.8);
   } else if (isP(id, P_BLOCK)) {
     float b = p.w;
     c = b < 0.5 ? vec3(0.48, 0.32, 0.22) : b < 1.5 ? vec3(0.72, 0.63, 0.48) : b < 2.5 ? vec3(0.78, 0.78, 0.75) : b < 3.5 ? vec3(0.56, 0.33, 0.20)
       : b < 4.5 ? vec3(0.66, 0.60, 0.48) : b < 5.5 ? vec3(0.80, 0.80, 0.77) : mix(vec3(0.70, 0.64, 0.52), vec3(0.78, 0.77, 0.73), fract(b * 0.37));
     float fy = fract((y - 0.016) / 0.0048);
     float w = winGrid(u, y, 0.11, 0.0048, 0.016, 0.55, 0.55, cell);
+    if (fine) {
+      // la fiancata di ogni palazzone, di scorcio sul lato sinistro: in ombra, o al sole se il sole arriva da sinistra
+      float bs = u < 3.31 ? 2.07 : u < 4.0 ? 3.31 : u < 5.17 ? 4.0 : u < 6.28 ? 5.17 : u < 7.3 ? 6.28 : u < 8.4 ? 7.3 : u < 9.6 ? 8.4 : 9.6;
+      float side = 1.0 - smoothstep(0.075, 0.085, u - bs);
+      c *= mix(1.0, mix(0.8, uSun.x < 0.0 ? 1.12 : 0.66, SUNK), side);
+      w *= 1.0 - side;
+    }
     vec3 recess = c * 0.58;                                                                       // in ombra sotto il balcone di sopra
     c = mix(recess, c * 1.05, mix(0.22, step(fy, 0.22), fineK(0.0048 * VS * 0.22)));              // le fasce chiare dei balconi
-    c = mix(c, vec3(0.18, 0.19, 0.21), w * step(0.22, fy) * 0.45);
+    // le tapparelle: abbassate del tutto, a meta' o alzate (vetro scuro), finestra per finestra
+    vec3 pane = vec3(0.17, 0.19, 0.22);
+    if (fine) {
+      float r = h21(cell + b * 7.0), level = r < 0.3 ? 1.0 : r < 0.58 ? 0.5 : 0.0;
+      float v = clamp((fy - 0.225) / 0.55, 0.0, 1.0);                                             // 0 al davanzale, 1 in alto
+      pane = mix(pane, c * 0.82 + 0.05, mix(level * 0.9, step(1.0 - level, v), fineK(0.0048 * VS * 0.55)));
+    }
+    c = mix(c, pane, w * step(0.22, fy) * 0.6);
   } else if (isP(id, P_GREEN)) {
     c = vec3(0.11, 0.17, 0.09) * (0.75 + 0.35 * vnoise(vec2(u * 40.0, y * 900.0)));
-  } else if (isP(id, P_SHORE)) {                                    // la riva del Mar Piccolo: alberi bassi, qualche casa bianca, colline velate
-    float strip = 0.0062 + 0.0016 * vnoise(vec2(u * 14.0, 2.0));
-    if (y < strip) {
-      c = vec3(0.17, 0.23, 0.17);
-      vec2 g = vec2(u / 0.05, (y - 0.0035) / 0.0016), f = fract(g);
-      if (y > 0.0035 && h21(floor(g) + 23.0) < 0.14 && f.x < 0.5 && f.y < 0.6) c = mix(c, vec3(0.66, 0.67, 0.65), 0.7);
-      hz = 0.45;
-    } else { c = vec3(0.40, 0.46, 0.50); hz = 0.6; }
+  } else if (isP(id, P_SHORE)) {
+    // la riva del Mar Piccolo, qualche chilometro oltre il ponte: un filo d'acqua che prende il cielo, una riga bassa di
+    // alberi e case bianche, poi le colline. E' la cosa piu' lontana della veduta: la piu' velata, anche con il sereno.
+    // (Prima la riga di alberi era alta mezza arcata e scura: sotto il ponte sembrava una massa piena.)
+    float strip = 0.0026 + 0.0009 * vnoise(vec2(u * 14.0, 2.0));
+    if (y < 0.0006) { c = haze * 1.05; hz = 0.3; }
+    else if (y < strip) {
+      c = vec3(0.25, 0.30, 0.25) * (0.9 + 0.2 * vnoise(vec2(u * 40.0, 3.0)));
+      vec2 g = vec2(u / 0.035, (y - 0.0008) / 0.0011), f = fract(g);
+      float hk = fineK(0.035 * HWB * 0.55);
+      c = mix(c, vec3(0.72, 0.72, 0.69), mix(0.06, step(h21(floor(g) + 23.0), 0.22) * step(f.x, 0.55) * step(f.y, 0.7) * 0.75, hk));
+      hz = 0.56;
+    } else {
+      c = vec3(0.40, 0.46, 0.50) * (0.93 + 0.14 * vnoise(vec2(u * 5.0, y * 400.0)));
+      hz = 0.64;
+    }
+  }
+  // la pietra sul pelo dell'acqua: una fascia bagnata, piu' scura e verdastra; piu' su, qualche colatura
+  if (fine && (isP(id, P_TOWER) || isP(id, P_STONE) || isP(id, P_CASTLE) || isP(id, P_QUAY))) {
+    c *= 1.0 - 0.10 * smoothstep(0.55, 0.85, vnoise(vec2(u * 45.0, y * 160.0)));
+    c = mix(c, c * vec3(0.55, 0.62, 0.52), 1.0 - smoothstep(0.0003, 0.0011, y));
   }
   // il sole vero, con il sereno: la faccia verso il sole si scalda, l'ombra prende l'azzurro del cielo.
   // La normale: le torri tonde girano da -1 (sinistra) a 1 (destra), il resto guarda verso di noi.
@@ -822,8 +860,9 @@ vec3 townDay(float u, float y, vec3 haze) {
     float lam = max(dot(N, vec3(uSun.x * ca, sin(uSun.z), uSun.y * ca)), 0.0);
     if (isP(id, P_ROOF) || isP(id, P_GREEN)) lam = max(lam, 0.15 + 0.8 * sin(uSun.z));   // tetti e chiome lo prendono dall'alto
     vec3 lit = vec3(0.52, 0.60, 0.78) * 0.75 + SUNCOL * lam * 1.2;
-    c *= mix(vec3(1.0), lit, SUNK);
-    hz = mix(hz, 0.17, SUNK);
+    bool far = isP(id, P_SHORE);                                    // la riva lontana resta velata: c'e' il triplo d'aria in mezzo
+    c *= mix(vec3(1.0), lit, SUNK * (far ? 0.5 : 1.0));
+    hz = mix(hz, far ? hz * 0.85 : 0.17, SUNK);
   }
   return mix(c, haze, hz);
 }
@@ -839,8 +878,17 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float tw = uWaveT, rf = wm(0.55, 1.0, 1.7), rh = wm(0.3, 1.0, 3.0);
     float big = fbm3(vec2(wp.x * 0.9 * rf, wp.y * 0.55 * rf - tw * 0.35));
     float rip = (big - 0.5) * rh;
-    col = mix(vec3(0.30, 0.38, 0.44), vec3(0.15, 0.22, 0.28), smoothstep(0.0, 0.3, dep)) * wm(1.0, 1.0, 0.62) + rip * 0.07;
-    col = mix(col, daySky(az, HOR + dep, t), 0.25 + 0.25 * (1.0 - uCloud) + wm(0.22, 0.0, -0.1));   // con il sereno l'acqua prende l'azzurro del cielo; con la calma ne e' lo specchio
+    // con il sereno il Mar Grande e' blu: profondo sotto la finestra, sempre piu' specchio del cielo verso l'orizzonte
+    // (Fresnel). Con il coperto (tema chiaro) clr e' zero e l'acqua resta quella grigio-azzurra di sempre.
+    float clr = 1.0 - smoothstep(0.3, 0.9, uCloud);
+    vec3 farW = mix(vec3(0.30, 0.38, 0.44), vec3(0.10, 0.22, 0.34), clr), nearW = mix(vec3(0.15, 0.22, 0.28), vec3(0.012, 0.065, 0.13), clr);
+    col = mix(farW, nearW, smoothstep(0.0, 0.3, dep)) * wm(1.0, 1.0, 0.62) + rip * mix(0.07, 0.035, clr);
+    float refl = 0.25 + 0.25 * (1.0 - uCloud) + wm(0.22, 0.0, -0.1);
+    refl = mix(refl, mix(0.75, 0.12, smoothstep(0.0, 0.2, dep)) + wm(0.12, 0.0, -0.05), clr);   // al sereno: Fresnel, specchio solo verso l'orizzonte
+    // le onde inclinano lo specchio: al sereno l'acqua riflette il cielo piu' alto, piu' blu, non solo il chiarore dell'orizzonte
+    col = mix(col, daySky(az, HOR + mix(dep, dep * 2.5 + 0.06, clr), t), clamp(refl, 0.0, 1.0));   // con il sereno l'acqua prende l'azzurro del cielo; con la calma ne e' lo specchio
+    // da vicino si vedono le increspature piccole sopra l'onda lunga
+    col *= 1.0 + (vnoise(vec2(wp.x * 3.1, wp.y * 2.2 - tw * 1.1)) - 0.5) * 0.16 * smoothstep(0.04, 0.25, dep) * wm(0.5, 1.0, 1.3);
     // Il ponte capovolto nell'acqua: la stessa sagoma (arcata, impalcato, spalle) specchiata sotto la linea di riva,
     // mossa dalle onde e sempre piu' sbiadita e rotta allontanandosi. Prima era una fascia scura dai bordi netti.
     float u = townU(az) + rip * (0.03 + dep * 3.0);
@@ -864,7 +912,7 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
       col = mix(col, steel * 0.78, bridgeMask(u, ry, 0.0014 + dep * 0.06) * brk * 0.85 * exp(-dep / 0.09));
     }
     // la citta' specchiata: la pietra del castello e del muraglione, sbiadita e mossa
-    if (u > -7.0 && u < 7.0 && dep < 0.1 && (u < -1.03 || u > 1.0)) col = mix(col, townDay(u, dep * 1.05 / VS, col), 0.2 * exp(-dep / 0.02));
+    if (u > -7.0 && u < 7.0 && dep < 0.1 && (u < -1.03 || u > 1.0)) col = mix(col, townDay(u, dep * 1.05 / VS, col, false), 0.2 * exp(-dep / 0.02));
     // la barca: scafo chiaro, cabina e una scia corta
     float ba = boatAz(t);
     float hull = (1.0 - smoothstep(0.0062, 0.0074, abs(az - ba))) * (1.0 - smoothstep(0.0009, 0.0013, abs(el - BOAT_EL - 0.0008)));
@@ -884,9 +932,24 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
     float edge = 0.0012 + blur * 0.002;
     float land = 1.0 - smoothstep(ce - edge, ce + edge, el);
     vec3 hill = mix(vec3(0.20, 0.26, 0.29), vec3(0.36, 0.42, 0.45), smoothstep(0.0, 0.05, el - HOR)) * (1.0 + 0.22 * (1.0 - uCloud));
+    if (land > 0.0 && townK(u) < 0.999) {
+      // le colline lontane: macchia a chiazze, i versanti girati verso il sole un po' piu' chiari e, al piede, i paesi bianchi
+      float hy = el - HOR;
+      hill *= 0.82 + 0.36 * fbm3(vec2(az * 70.0, hy * 260.0));
+      hill *= 1.0 - 0.12 * smoothstep(0.6, 0.8, vnoise(vec2(az * 140.0, hy * 600.0)));              // filari e boschetti piu' scuri
+      float nx = clamp(-(coast(az + 0.003) - coast(az)) / 0.003 * 3.0, -1.0, 1.0);            // da che parte guarda il versante
+      hill *= 1.0 + nx * uSun.x * 0.22 * SUNK + 0.05 * abs(nx) * (1.0 - SUNK);
+      // le case: sparse e storte dentro la loro cella, larghe ognuna a modo suo; i paesi a grappoli salgono un po' sui versanti
+      vec2 g = vec2(az / 0.0032, hy / 0.0018), gi = floor(g), f = fract(g) - 0.5, jit = h22(gi + 61.0) - 0.5;
+      float bw = 0.2 + 0.2 * h21(gi + 7.0);
+      float one = step(h21(gi + 61.0), 0.45) * step(abs(f.x - jit.x * 0.4), bw) * step(abs(f.y - jit.y * 0.3), 0.22);
+      float house = mix(0.12, one, fineK(0.0032 * 0.5));
+      float place = smoothstep(0.5, 0.75, vnoise(vec2(az * 30.0, 1.0))) * (1.0 - smoothstep(0.003, 0.02 * (0.4 + vnoise(vec2(az * 12.0, 4.0))), hy));
+      hill = mix(hill, vec3(0.66, 0.66, 0.63) * (1.0 + 0.4 * SUNK), house * place * 0.65);
+    }
     vec3 haze = daySky(az, HOR + 0.02, t);
     float yc = min(y, (ce - HOR) / VS - 0.0002);                 // sul bordo del profilo il colore e' quello dell'elemento sotto
-    if (inTown(u)) hill = mix(hill, townDay(u, yc, haze), townK(u));   // velati dalla distanza
+    if (inTown(u)) hill = mix(hill, townDay(u, yc, haze, true), townK(u));   // velati dalla distanza
     col = mix(daySky(az, el, t), hill, land);
     if (u > -2.2 && u < 7.0) {                                   // l'antenna e la bandiera sul castello, le palme sul muraglione
       float e2 = edge * 0.5 / DIST;
@@ -924,6 +987,22 @@ vec3 dayOutside(vec3 dir, float blur, float t) {
         float kind = mod(float(i), 3.0);
         vec3 paint = kind < 0.5 ? vec3(0.72, 0.16, 0.12) : kind < 1.5 ? vec3(0.88, 0.89, 0.90) : vec3(0.16, 0.20, 0.26);
         col = mix(col, mix(paint, haze, 0.4), body * c.y * 0.8);
+      }
+    }
+    // tre gabbiani planano piano sopra l'acqua, con le ali ad M; ogni tanto le battono
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float ph = fract(t * (0.0045 + 0.0015 * fi) + fi * 0.37);
+      // bassi, davanti alla citta' e alle colline: sopra, nella vista d'insieme, c'e' subito la barra del sito
+      vec2 g0 = vec2(mix(-0.7, 0.7, ph), HOR + 0.012 + 0.011 * fi + 0.004 * sin(t * 0.21 + fi * 2.0));
+      float s = 0.0065 - 0.0012 * fi;                                  // mezza apertura alare, in radianti
+      vec2 q = (vec2(az, el) - g0) / s;
+      float ax = abs(q.x);
+      if (ax < 1.0 && abs(q.y) < 1.0) {
+        float flap = sin(t * 8.0 + fi * 3.0) * smoothstep(0.6, 0.8, sin(t * 0.45 + fi * 1.7));
+        float wy = (1.0 + 0.8 * flap) * (0.6 * sqrt(ax) - 0.62 * ax);
+        float a = (1.0 - smoothstep(0.5 * PIX, 1.5 * PIX, abs(q.y - wy) * s)) * (1.0 - smoothstep(0.85, 1.0, ax));
+        col = mix(col, mix(vec3(0.30, 0.32, 0.35), vec3(0.88, 0.89, 0.88), land), a * 0.85);
       }
     }
   }
@@ -1165,37 +1244,148 @@ void main() {
   group.add(projection);
   let pjLines = null, pjNight = true;
   let windTarget = 0.5, waveExtra = 0;   // vento verso cui il mare si porta; scarto accumulato del tempo delle onde
+  // l'icona del tempo, disegnata a parte e poi copiata: le nuvole "bucano" il sole o la luna che hanno dietro, con un
+  // bordo vuoto che le stacca. Sole o luna (di notte) in ambra, nuvole nel colore del testo, gocce, fiocchi e fulmine.
+  const icon = canvas(180, 180), icx = icon.getContext("2d");
+  function drawIcon(kind, night, main, ink) {
+    const x = icx;
+    x.clearRect(0, 0, 180, 180);
+    x.lineCap = x.lineJoin = "round";
+    x.globalCompositeOperation = "source-over";
+    const sun = (cx, cy, r) => {
+      x.fillStyle = x.strokeStyle = main;
+      x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+      x.lineWidth = 8;
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4, c = Math.cos(a), s = Math.sin(a);
+        x.beginPath(); x.moveTo(cx + c * r * 1.42, cy + s * r * 1.42); x.lineTo(cx + c * r * 1.85, cy + s * r * 1.85); x.stroke();
+      }
+    };
+    const moon = (cx, cy, r) => {                                      // la falce: un disco a cui se ne toglie un altro
+      x.fillStyle = main;
+      x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+      x.globalCompositeOperation = "destination-out";
+      x.beginPath(); x.arc(cx + r * 0.5, cy - r * 0.32, r * 0.84, 0, Math.PI * 2); x.fill();
+      x.globalCompositeOperation = "source-over";
+    };
+    const lum = (cx, cy, r) => (night ? moon(cx, cy, r * 1.15) : sun(cx, cy, r));
+    const cloudPath = (cx, cy, w) => {
+      x.beginPath();
+      const c = (ox, oy, r) => { x.moveTo(cx + ox + r, cy + oy); x.arc(cx + ox, cy + oy, r, 0, Math.PI * 2); };
+      c(-w * 0.28, w * 0.04, w * 0.22); c(w * 0.04, -w * 0.1, w * 0.3); c(w * 0.32, w * 0.06, w * 0.2);
+      x.rect(cx - w * 0.28, cy, w * 0.6, w * 0.26);
+    };
+    const cloud = (cx, cy, w, col) => {
+      x.globalCompositeOperation = "destination-out";
+      x.lineWidth = 14; cloudPath(cx, cy, w); x.stroke(); x.fill();
+      x.globalCompositeOperation = "source-over";
+      x.fillStyle = col; cloudPath(cx, cy, w); x.fill();
+    };
+    const drops = (cx, cy, n) => {
+      x.strokeStyle = main; x.lineWidth = 8;
+      for (let i = 0; i < n; i++) { const dx = cx + (i - (n - 1) / 2) * 24; x.beginPath(); x.moveTo(dx + 6, cy); x.lineTo(dx - 4, cy + 24); x.stroke(); }
+    };
+    const flakes = (cx, cy, n) => {
+      x.strokeStyle = main; x.lineWidth = 5;
+      for (let i = 0; i < n; i++) {
+        const fx = cx + (i - (n - 1) / 2) * 30, fy = cy + 12 + (i % 2) * 8;
+        for (let k = 0; k < 3; k++) { const a = (k * Math.PI) / 3, c = Math.cos(a) * 11, s = Math.sin(a) * 11; x.beginPath(); x.moveTo(fx - c, fy - s); x.lineTo(fx + c, fy + s); x.stroke(); }
+      }
+    };
+    const bolt = (cx, cy) => {
+      x.fillStyle = "#FF5A3D";
+      x.beginPath();
+      [[6, -4], [-14, 24], [-1, 24], [-8, 48], [18, 14], [4, 14], [12, -4]].forEach(([px, py], i) => (i ? x.lineTo(cx + px, cy + py) : x.moveTo(cx + px, cy + py)));
+      x.closePath(); x.fill();
+    };
+    const ghost = night ? "rgba(255, 233, 200, 0.5)" : "rgba(22, 34, 45, 0.45)";
+    if (kind === "clear") lum(90, 90, 34);
+    else if (kind === "fair") { lum(70, 66, 28); cloud(112, 116, 96, ink); }
+    else if (kind === "partly") { lum(64, 60, 28); cloud(100, 104, 130, ink); }
+    else if (kind === "cloudy") { cloud(66, 70, 92, ghost); cloud(102, 104, 130, ink); }
+    else if (kind === "fog") {
+      cloud(90, 66, 120, ghost);
+      x.strokeStyle = ink; x.lineWidth = 8;
+      [[34, 120, 146], [50, 138, 130], [28, 156, 150]].forEach(([x0, y, x1]) => { x.beginPath(); x.moveTo(x0, y); x.lineTo(x1, y); x.stroke(); });
+    } else {
+      cloud(90, 70, 130, ink);
+      if (kind === "lightrain") drops(90, 118, 2);
+      else if (kind === "rain") drops(90, 118, 3);
+      else if (kind === "heavyrain") drops(90, 118, 4);
+      else if (kind === "sleet") { drops(70, 118, 1); flakes(110, 112, 1); }
+      else if (kind === "snow") flakes(90, 112, 3);
+      else if (kind === "thunder") { drops(58, 118, 1); drops(126, 118, 1); bolt(92, 100); }
+    }
+  }
   function drawProjection() {
-    const x = pjCtx, W = PJ.cw;
-    x.clearRect(0, 0, W, PJ.ch);
+    const x = pjCtx, W = PJ.cw, H = PJ.ch;
+    x.clearRect(0, 0, W, H);
     if (pjLines) {
       const N = pjNight;
       const amber = N ? "#FFB44A" : "#7A3E00", ink = N ? "#FFE9C8" : "#16222D", soft = N ? "rgba(255, 226, 186, 0.86)" : "rgba(22, 34, 45, 0.86)";
+      const faint = N ? "rgba(255, 226, 186, 0.62)" : "rgba(22, 34, 45, 0.7)";
       const glow = (c, b) => { x.shadowColor = N ? c : "rgba(255, 255, 255, 0.75)"; x.shadowBlur = N ? b : 4; };
       const fit = (text, size, weight, max) => { let s = size + 4; do { s -= 4; x.font = `${weight} ${s}px ${FONT}`; } while (x.measureText(text).width > max && s > 26); };
       x.textBaseline = "alphabetic";
-      // in alto: la temperatura grande a sinistra; a destra che tempo fa, il posto con l'ora e la fonte dei dati
-      let left = 44;
+      x.lineCap = x.lineJoin = "round";
+      // di giorno un vetro smerigliato chiaro dietro le scritte: si leggono come un display sul vetro, non come un adesivo
+      if (!N) {
+        const r = 12, x0 = 26, y0 = 8, x1 = W - 26, y1 = H - 6;
+        x.beginPath(); x.moveTo(x0 + r, y0);
+        x.arcTo(x1, y0, x1, y1, r); x.arcTo(x1, y1, x0, y1, r); x.arcTo(x0, y1, x0, y0, r); x.arcTo(x0, y0, x1, y0, r);
+        x.closePath();
+        x.fillStyle = "rgba(238, 241, 236, 0.52)"; x.fill();
+      }
+      // gli angoli del riquadro, come in un mirino
+      x.shadowBlur = 0;
+      x.strokeStyle = N ? "rgba(255, 180, 74, 0.6)" : "rgba(122, 62, 0, 0.6)"; x.lineWidth = 4;
+      x.beginPath();
+      for (const [cx, cy, sx, sy] of [[36, 16, 1, 1], [W - 36, 16, -1, 1], [36, H - 12, 1, -1], [W - 36, H - 12, -1, -1]]) {
+        x.moveTo(cx + sx * 30, cy); x.lineTo(cx, cy); x.lineTo(cx, cy + sy * 30);
+      }
+      x.stroke();
+      // in alto: l'icona, la temperatura grande; a destra che tempo fa, il posto con l'ora, il vento e la fonte dei dati
+      let left = 48;
+      if (pjLines.icon) {
+        drawIcon(pjLines.icon, N, amber, ink);
+        glow("rgba(255, 160, 60, 0.8)", 18);
+        x.drawImage(icon, 34, 24, 168, 168);
+        left = 34 + 168 + 16;
+      }
       if (pjLines.big) {
-        fit(pjLines.big, 196, 800, 440);
+        fit(pjLines.big, 190, 800, 330);
         glow("rgba(255, 160, 60, 0.85)", 22);
         x.fillStyle = amber;
-        x.fillText(pjLines.big, left, 186);
-        left += x.measureText(pjLines.big).width + 40;
+        x.fillText(pjLines.big, left, 184);
+        left += x.measureText(pjLines.big).width + 34;
       }
-      const max = W - left - 40;
-      fit(pjLines.main, 84, 700, max);
+      const max = W - left - 48;
+      fit(pjLines.main, 80, 700, max);
       glow("rgba(255, 200, 130, 0.7)", 14);
       x.fillStyle = ink;
-      x.fillText(pjLines.main, left, 88);
-      fit(pjLines.sub, 54, 600, max);
+      x.fillText(pjLines.main, left, 86);
+      fit(pjLines.sub, 50, 600, max);
       x.fillStyle = soft;
-      x.fillText(pjLines.sub, left, 148);
-      if (pjLines.credit) {
-        x.font = `500 34px ${FONT}`;
-        x.fillStyle = N ? "rgba(255, 226, 186, 0.62)" : "rgba(22, 34, 45, 0.7)";
-        x.fillText(pjLines.credit, left, 192);
+      x.fillText(pjLines.sub, left, 142);
+      // la riga piccola: il vento (tre fili di vento e i metri al secondo) e la fonte; si stringe se non ci sta
+      const credit = pjLines.credit || "", wind = pjLines.wind || "";
+      let fs = 34, gw = 0;
+      const width = () => { x.font = `500 ${fs}px ${FONT}`; gw = wind ? fs * 1.3 : 0; return gw + (wind ? x.measureText(wind + "   ·   ").width : 0) + x.measureText(credit).width; };
+      while (width() > max && fs > 24) fs -= 2;
+      let cx = left;
+      x.fillStyle = faint;
+      if (wind) {
+        x.shadowBlur = 0;
+        const gy = 190 - fs * 0.34, s = fs / 34;
+        x.strokeStyle = faint; x.lineWidth = 3.5 * s;
+        x.beginPath(); x.moveTo(cx, gy - 9 * s); x.lineTo(cx + 24 * s, gy - 9 * s); x.arc(cx + 24 * s, gy - 15 * s, 6 * s, Math.PI / 2, -Math.PI * 0.85, true); x.stroke();
+        x.beginPath(); x.moveTo(cx + 4 * s, gy); x.lineTo(cx + 34 * s, gy); x.stroke();
+        x.beginPath(); x.moveTo(cx, gy + 9 * s); x.lineTo(cx + 20 * s, gy + 9 * s); x.arc(cx + 20 * s, gy + 15 * s, 6 * s, -Math.PI / 2, Math.PI * 0.85, false); x.stroke();
+        cx += gw;
+        x.fillText(wind + (credit ? "   ·   " : ""), cx, 192);
+        cx += x.measureText(wind + (credit ? "   ·   " : "")).width;
       }
+      if (credit) x.fillText(credit, cx, 192);
       const hrs = pjLines.hours;
       if (hrs) {
         // in basso la curva: temperatura ora per ora (linea) e pioggia (barre a tacche, come lo spettro)
@@ -1205,6 +1395,11 @@ void main() {
         if (hi - lo < 4) { const m = (hi + lo) / 2; lo = m - 2; hi = m + 2; }
         const py = (t) => bottom - ((t - lo) / (hi - lo)) * (bottom - top);
         x.shadowBlur = 0;
+        // la griglia: ogni tre ore un filo a puntini dalla curva alle barre della pioggia
+        x.strokeStyle = N ? "rgba(255, 190, 120, 0.26)" : "rgba(22, 34, 45, 0.25)"; x.lineWidth = 2;
+        x.setLineDash([2, 8]);
+        for (let i = 0; i < hrs.length; i += 3) { x.beginPath(); x.moveTo(px(i), py(hrs[i].temp) + 14); x.lineTo(px(i), floor - 62); x.stroke(); }
+        x.setLineDash([]);
         hrs.forEach((h, i) => {
           const bw = 18, bx = px(i) - bw / 2, mm = Math.min(4, h.mm), tall = mm > 0 ? 10 + 46 * Math.sqrt(mm / 4) : 4;
           for (let y = floor; y > floor - tall; y -= 8) {
@@ -1221,24 +1416,24 @@ void main() {
             x.bezierCurveTo(mx, py(hrs[i - 1].temp), mx, py(hrs[i].temp), px(i), py(hrs[i].temp));
           }
         };
-        x.lineCap = x.lineJoin = "round";
         glow("rgba(255, 160, 60, 0.95)", 20);
         x.strokeStyle = amber; x.lineWidth = 7; path(); x.stroke();
         if (N) { x.shadowBlur = 0; x.strokeStyle = "#FFF0D8"; x.lineWidth = 2.5; path(); x.stroke(); }
-        // ogni tre ore: il punto, i gradi sopra e l'ora sotto
+        // ogni tre ore: il punto, i gradi sopra e l'ora sotto; l'ora attuale ha un anello in piu'
         x.textAlign = "center";
         for (let i = 0; i < hrs.length; i += 3) {
           const cx = px(i), cy = py(hrs[i].temp);
           glow("rgba(255, 160, 60, 0.9)", 12);
           x.fillStyle = N ? "#FFF0D8" : amber;
           x.beginPath(); x.arc(cx, cy, 7, 0, Math.PI * 2); x.fill();
+          if (i === 0) { x.strokeStyle = amber; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, 15, 0, Math.PI * 2); x.stroke(); }
           x.font = `700 40px ${FONT}`;
           x.fillStyle = ink;
-          x.fillText(Math.round(hrs[i].temp) + "°", cx, cy - 18);
+          x.fillText(Math.round(hrs[i].temp) + "°", cx, cy - 20);
           x.shadowBlur = 0;
           x.font = `600 38px ${FONT}`;
           x.fillStyle = soft;
-          x.fillText(hrs[i].label, cx, 442);
+          x.fillText(hrs[i].label, cx, 440);
         }
         x.textAlign = "left";
       }
@@ -1307,7 +1502,7 @@ void main() {
       const m = h.moon;
       if (m.el > -0.008 && Math.abs(m.az) < PATCH.az) { u.uMoon.value.set(m.az, m.el, m.lit, 1); u.uMoonDir.value.set(m.dir[0], m.dir[1]); }
     },
-    // testo proiettato sul vetro: { big, main, sub, credit, hours: [{ temp, mm, label }] | null }; null lo spegne
+    // testo proiettato sul vetro: { big, main, sub, credit, icon (tipo di tempo), wind, hours: [{ temp, mm, label }] | null }; null lo spegne
     setProjection(lines) {
       pjLines = lines;
       projection.visible = !!lines;
